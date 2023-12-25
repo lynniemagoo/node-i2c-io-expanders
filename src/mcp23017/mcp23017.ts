@@ -148,28 +148,27 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
       buffAllOn: Buffer = Buffer.from([0xFF, 0xFF]),
       buffAllOff: Buffer = Buffer.from([0x00, 0x00]);
 
-
     this._i2cBus.writeByteSync(this._address, MCP23017_REGISTERS.IOCONA, ioconFlags);
 
-    // On startup, disable all interrupts.
+    // Disable all interrupts.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPINTENA, 2, buffAllOff);
 
-    // On startup, Force all pins to input.
+    // Set pins marked as input.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.IODIRA, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]));
 
-    // On startup, Force all pins to Pull-Up.
+    // Force all pins to Pull-Up.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPPUA, 2, buffAllOn);
 
-    // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
+    // Force no Polarity Invert as we will manage this in software with the _inverted bitField.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.IPOLA, 2, buffAllOff);
 
-    // On startup, Set interrupt change default values to 0.
+    // Set interrupt change default values to 0.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.DEFVALA, 2, buffAllOff);
 
-    // On startup, Force interrupts to fire on state change - don't compare to DEFVAL.
+    // Force interrupts to fire on state change - don't compare to DEFVAL.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.INTCONA, 2, buffAllOff);
 
-    // On startup, Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
+    // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([initialState & 0xFF, (initialState >> 8) & 0xFF]));
   }
 
@@ -183,7 +182,7 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     });
   }
 
-  _writeIODirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void {
+  _writeDirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void {
     this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.IODIRA, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
       if (err || (bytesWritten != 2)) {
         writeComplete(err);

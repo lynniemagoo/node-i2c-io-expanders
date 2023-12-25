@@ -230,8 +230,8 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   protected abstract _initializeChip(initialState: number, inputPinBitmask: number) : void;
   protected abstract _writeState(state: number, writeComplete: (err?: Error) => void) : void;
   protected abstract _readState(readError: (err: Error) => void, readComplete: (readState: number) => void) : void;
-  protected _writeIODirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void { writeComplete(); };
-  protected _writeInterruptControlSync(interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
+  protected _writeDirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void { writeComplete(); };
+  protected _writeInterruptControlSync(_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
   protected _writeInterruptControl(interruptBitmask: number, writeComplete: (err?: Error) => void) : void { writeComplete(); } ;
 
   /**
@@ -428,23 +428,51 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {number}  inputPinBitmask .
    * @return {Promise} Promise which gets resolved when the inputPinBitmask is written to the IC, or rejected in case of an error.
    */
-  private _setInterruptControlAndIODirection(inputPinBitmask: number): Promise <void> {
+  private _setInterruptControlAndDirection(inputPinBitmask: number): Promise <void> {
     return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      const controlResult = (err: Error) : void => {
-        if (err) {
-          reject(err);
-        } else {
-          const directionResult = (err: Error) : void => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            };
+      // If interrupts are enabled then we need to update the interrupts based on input pin bitmask.
+      // 1) disable interupts
+      // 2) update IO direction
+      // 3) enable interrupts
+      if (this._gpio !== null) {
+        const disableInterruptResult = (err: Error) : void => {
+          if (err) {
+            reject(err);
+          } else {
+            const directionResult = (err: Error) : void => {
+              if (err) {
+                reject(err);
+              } else {
+                const enableInterruptResult = (err: Error) : void => {
+                  if (err) {
+                    reject(err);
+                  } else {
+                    resolve();
+                  };
+                };
+                // 3) enable interrupts for input pins only.
+                this._writeInterruptControl(inputPinBitmask, enableInterruptResult);
+              }
+            }
+            // 2) update directon
+            this._writeDirection(inputPinBitmask, directionResult);
+          }
+        };
+        // 1) disable interrupts for all pins
+        this._writeInterruptControl(0x00, disableInterruptResult);
+      } else {
+        // interrupts are not active so write direction only.
+        // 1) update IO Direction
+        const directionResult = (err: Error) : void => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
           };
-          this._writeIODirection(inputPinBitmask, directionResult);
-        }
-      };
-      this._writeInterruptControl(inputPinBitmask, controlResult);
+        };
+        // 1) update direction
+        this._writeDirection(inputPinBitmask, directionResult);
+      }
     });
   }
 
@@ -467,7 +495,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     this._directions[pin] = IOExpander.DIR_IN;
 
     // set the input bit mask and interrupt control.
-    return this._setInterruptControlAndIODirection(this._inputPinBitmask)
+    return this._setInterruptControlAndDirection(this._inputPinBitmask)
       // ... and call _setNewState() to activate the high level on the input pin ...
       .then(() => this._setNewState())
       // ... and then poll all current inputs with noEmit on this pin to suppress the event
@@ -497,11 +525,11 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
 
     // set the initial value only if it is defined, otherwise keep the last value (probably from the initial state)
     if (typeof (initialValue) === 'undefined') {
-      return this._setInterruptControlAndIODirection(this._inputPinBitmask)
+      return this._setInterruptControlAndDirection(this._inputPinBitmask)
         //... and return resolved promise as nothing else need be done.
         .then(() => Promise.resolve(null));
     } else {
-      return this._setInterruptControlAndIODirection(this._inputPinBitmask)
+      return this._setInterruptControlAndDirection(this._inputPinBitmask)
         // ... and then set the internal pin state.
         .then(() => this._setPinInternal(pin, initialValue));
     }

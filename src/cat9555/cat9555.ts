@@ -92,7 +92,7 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
     });
   }
 
-  _writeIODirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void {
+  _writeDirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void {
     this._i2cBus.writeI2cBlock(this._address, CAT9555_REGISTERS.CON_PORT_0, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
       if (err || (bytesWritten != 2)) {
         writeComplete(err);

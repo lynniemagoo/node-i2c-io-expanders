@@ -54,7 +54,7 @@ export class PCF8575 extends IOExpander<IOExpander.PinNumber16> {
 
   _getPinCount() : number { return 16; }
 
-  _initializeChip(initialState: number, inputPinBitmask: number) : void {
+  _initializeChip(initialState: number, _inputPinBitmask: number) : void {
     this._i2cBus.i2cWriteSync(this._address, 2, Buffer.from([initialState & 0xFF, (initialState >>> 8) & 0xFF]));
   }
 

@@ -1,71 +1,72 @@
 "use strict";
 /*
- * Node.js CAT9555.js
+ * Node.js PCF8574/PCF8574A
  *
- * Copyright (c) 2023 Lyndel McGee <lynniemagoo@yahoo.com>
+ * Copyright (c) 2017-2023 Peter Müller <peter@crycode.de> (https://crycode.de)
+ *               2022 - PCF8575 support inspired by Lyndel McGee <lynniemagoo@yahoo.com>
  *
- * Node.js module for controlling each pin of a CAT9555 I2C port expander IC.
+ * Node.js module for controlling each pin of a PCF8574/PCF8574A I2C port expander IC.
  *
  * This example is showing you how to setup and use inputs and outputs.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-// Import the CAT9555 class from the CAT9555 module
-//import { CAT9555 } from 'CAT9555';
+// Import the PCF8574 class from the pcf8574 module
+//import { PCF8574 } from 'pcf8574';
 var __1 = require("../../");
 // Import the i2c-bus module and open the bus
 var i2c_bus_1 = require("i2c-bus");
 var i2cBus = (0, i2c_bus_1.openSync)(1);
-// Define the address of the CAT9555 (0x20)
-var addr = 0x27;
-// Init a new CAT9555 with all pins high by default
-// Instead of 'true' you can also use a 16-bit binary notation to define each
-// pin speratly, e.g. 0b0000000000101010
-var cat = new __1.CAT9555(i2cBus, addr, true);
-// Enable interrupt detection on BCM pin 18 (which is GPIO.0)
-cat.enableInterrupt(18);
+// Define the address of the PCF8574 (0x20) /PCF8574A (0x38)
+var addr = 0x20;
+// Init a new PCF8574 with all pins high by default
+// Instead of 'true' you can also use a 8-bit binary notation to define each
+// pin separately, e.g. 0b00101010
+var pcf = new __1.PCF8574(i2cBus, addr, true);
+// Enable interrupt detection on BCM pin 17 (which is GPIO.0)
+pcf.enableInterrupt(17);
 // Alternatively you can use for example an interval for manually poll every 250ms
-// setInterval(cat.doPoll.bind(cat), 250);
+// setInterval(pcf.doPoll.bind(pcf), 250);
 // Note the missing ; at the end of the following lines.
 // This is a Promise chain!
-cat.outputPin(7, true, false)
+pcf.outputPin(0, true, false)
     .then(function () {
-    return cat.outputPin(6, true, false);
+    return pcf.outputPin(1, true, false);
 })
     .then(function () {
-    return cat.outputPin(5, true, false);
+    return pcf.outputPin(2, true, false);
 })
     .then(function () {
-    return cat.outputPin(4, true, false);
+    return pcf.outputPin(3, true, false);
 })
-    // Then define pins 0-3 as inverted input
+    // Then define pin 7 as non inverted input
     .then(function () {
-    return cat.inputPin(0, true);
-})
-    .then(function () {
-    return cat.inputPin(1, true);
+    return pcf.inputPin(7, true);
 })
     .then(function () {
-    return cat.inputPin(2, true);
+    return pcf.inputPin(6, true);
 })
     .then(function () {
-    return cat.inputPin(3, true);
+    return pcf.inputPin(5, true);
 })
     .then(function () {
-    return cat.setPin(5);
+    return pcf.inputPin(4, true);
 })
-    // Delay 1 second
-    .then(function () { return new Promise(function (resolve) {
-    setTimeout(resolve, 1000);
-}); })
     .then(function () {
-    return cat.setPin(5);
+    return pcf.setPin(1);
 })
     // Delay 1 second
     .then(function () { return new Promise(function (resolve) {
     setTimeout(resolve, 1000);
 }); })
     .then(function () {
-    return cat.setPin(6);
+    return pcf.setPin(1);
+})
+    // Delay 1 second
+    .then(function () { return new Promise(function (resolve) {
+    setTimeout(resolve, 1000);
+}); })
+    .then(function () {
+    return pcf.setPin(2);
 })
     // Delay 1 second
     .then(function () { return new Promise(function (resolve) {
@@ -73,33 +74,33 @@ cat.outputPin(7, true, false)
 }); })
     // Then turn the pin on
     .then(function () {
-    return cat.setPin(6);
+    pcf.setPin(2);
 })
     // Delay 1 second
     .then(function () { return new Promise(function (resolve) {
     setTimeout(resolve, 1000);
 }); });
 // Add an event listener on the 'input' event
-cat.on('input', function (data) {
+pcf.on('input', function (data) {
     console.log('input', data);
     switch (data.pin) {
-        case 3:
-            cat.setPin(7, data.value);
+        case 7:
+            pcf.setPin(3, data.value);
             break;
-        case 2:
-            cat.setPin(6, data.value);
+        case 6:
+            pcf.setPin(2, data.value);
             break;
-        case 1:
-            cat.setPin(5, data.value);
+        case 5:
+            pcf.setPin(1, data.value);
             break;
-        case 0:
+        case 4:
         default:
-            cat.setPin(4, data.value);
+            pcf.setPin(0, data.value);
             break;
     }
 });
 // Handler for clean up on SIGINT (ctrl+c)
 process.on('SIGINT', function () {
-    cat.removeAllListeners();
-    cat.disableInterrupt();
+    pcf.removeAllListeners();
+    pcf.disableInterrupt();
 });

@@ -105,9 +105,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /** The address of the CAT9555 IC. */
   protected _address: number;
 
-  /** The type of the IC. */
-  //protected _type: IOEXPANDER_TYPE;
-
   /** Number of pins the IC has. */
   protected _pins: 8 | 16;
 

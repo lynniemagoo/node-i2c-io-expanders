@@ -8,7 +8,7 @@
  */
 import { I2CBus } from 'i2c-bus';
 
-import { IOExpander, IOEXPANDER_TYPE } from '../shared/ioExpander';
+import { IOExpander } from '../shared/ioExpander';
 
 /**
  * Namespace for types for PCF8575
@@ -49,27 +49,41 @@ export class PCF8575 extends IOExpander<IOExpander.PinNumber16> {
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin seprately, or use true/false for all pins at once.
    */
   constructor (i2cBus: I2CBus, address: number, initialState: boolean | number) {
-    super(i2cBus, address, initialState, IOEXPANDER_TYPE.PCF8575);
+    super(i2cBus, address, initialState, 16);
   }
 
-  _getPinCount() : number { return 16; }
-
-  _initializeChip(initialState: number, _inputPinBitmask: number) : void {
+  _initializeChipSync (initialState: number, _inputPinBitmask: number) : void {
     this._i2cBus.i2cWriteSync(this._address, 2, Buffer.from([initialState & 0xFF, (initialState >>> 8) & 0xFF]));
   }
 
-  _writeState(state: number, writeComplete: (err?: Error) => void) : void {
-    this._i2cBus.i2cWrite(this._address, 2, Buffer.from([state & 0xFF, (state >>> 8) & 0xFF]), writeComplete);
+  _readState () : Promise<number> {
+    return new Promise((resolve: (value: number) => void, reject: (err: Error) => void) => {
+      // We don't use PromisifedBus here as the i2cRead does not reject impartial buffer reads.
+      this._i2cBus.i2cRead(this._address, 2, Buffer.alloc(2), (err: Error, bytesRead: number, buffer: Buffer) => {
+        if (err) {
+          reject(err);
+        }else if (bytesRead !== 2) {
+          reject(new Error('Incomplete read.'));
+        } else {
+          // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
+          resolve(buffer[0] | (buffer[1] << 8));
+        }
+      });
+    });
   }
 
-  _readState(readError: (err: Error) => void, readComplete: (readState: number) => void) : void {
-    this._i2cBus.i2cRead(this._address, 2, Buffer.alloc(2), (err: Error, bytesRead: number, buffer: Buffer) => {
-      if (err || bytesRead !== 2) {
-        readError(err);
-      } else {
-        // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
-        readComplete(buffer[0] | (buffer[1] << 8));
-      }
+  _writeState (state: number) : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      // We don't use PromisifedBus here as the i2cWrite does not reject impartial buffer writes.
+      this._i2cBus.i2cWrite(this._address, 2, Buffer.from([state & 0xFF, (state >>> 8) & 0xFF]), (err: Error, bytesWritten: number) => {
+        if (err) {
+          reject(err);
+        }else if (bytesWritten !== 2) {
+          reject(new Error('Incomplete write.'));
+        } else {
+          resolve();
+        }
+      });
     });
   }
 }

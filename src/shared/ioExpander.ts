@@ -4,22 +4,6 @@ import { Gpio } from 'onoff';
 import { PromiseQueue } from './promise-queue';
 
 /**
- * Enum of the known IC types.
- */
-export enum IOEXPANDER_TYPE {
-  /** CAT9555 IC with 16 pins */
-  CAT9555,
-
-  /** MCP23017 IC with 16 pins */
-  MCP23017,
-
-  /** PCF8575 IC with 16 pins */
-  PCF8575,
-
-  /** PCF8574 IC with 8 pins */
-  PCF8574
-}
-/**
  * Namespace for the common class PCF857x.
  */
 export namespace IOExpander {
@@ -122,7 +106,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   protected _address: number;
 
   /** The type of the IC. */
-  protected _type: IOEXPANDER_TYPE;
+  //protected _type: IOEXPANDER_TYPE;
 
   /** Number of pins the IC has. */
   protected _pins: 8 | 16;
@@ -162,30 +146,14 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin separately, or use true/false for all pins at once.
    * @param  {IOEXPANDER_TYPE}   type         The type of the used IC.
    */
-  constructor (i2cBus: I2CBus, address: number, initialState: boolean | number, type: IOEXPANDER_TYPE) {
+  constructor (i2cBus: I2CBus, address: number, initialState: boolean | number, pinCount: 8 | 16) {
     super();
 
     // bind the _handleInterrupt method strictly to this instance
     this._handleInterrupt = this._handleInterrupt.bind(this);
 
     this._i2cBus = i2cBus;
-    this._type = type;
 
-    // define type specific stuff
-    switch (this._type) {
-      case IOEXPANDER_TYPE.CAT9555:
-      case IOEXPANDER_TYPE.MCP23017:
-      case IOEXPANDER_TYPE.PCF8575:
-        //this._pins = 16;
-        break;
-      case IOEXPANDER_TYPE.PCF8574:
-        //this._pins = 8;
-        break;
-      default:
-        throw new Error('Unsupported type');
-    }
-
-    const pinCount = this._getPinCount();
     if ((pinCount !== 8) && (pinCount !== 16)) {
       throw new Error('Unsupported pin count');
     }
@@ -220,19 +188,17 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     // MCP2017 Page 16 of datasheet - The default values of IODIRA/IODIRB are all 1's meaning all 16 pins are input by default.
     this._inputPinBitmask = Math.pow(2, this._pins) - 1;
 
-    this._initializeChip(initialState, this._inputPinBitmask);
+    this._initializeChipSync(initialState, this._inputPinBitmask);
   }
 
-  // TODO - SHOULD CONTINUE TO SUPPORT _getPinCount as abstract method?
-  // Or continue to rely on _type which is only used in construction?
-  // As an alternative, we could pass in the pinCount via constructor as allowed values of 8 or 16.
-  protected abstract _getPinCount() : number;
-  protected abstract _initializeChip(initialState: number, inputPinBitmask: number) : void;
-  protected abstract _writeState(state: number, writeComplete: (err?: Error) => void) : void;
-  protected abstract _readState(readError: (err: Error) => void, readComplete: (readState: number) => void) : void;
-  protected _writeDirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void { writeComplete(); };
-  protected _writeInterruptControlSync(_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
-  protected _writeInterruptControl(interruptBitmask: number, writeComplete: (err?: Error) => void) : void { writeComplete(); } ;
+  // Required methods for any implementation.
+  protected abstract _initializeChipSync (initialState: number, inputPinBitmask: number) : void;
+  protected abstract _readState () : Promise<number>;
+  protected abstract _writeState (state: number) : Promise<void>;
+  // Optional methods for any implementation.
+  protected _writeInterruptControlSync (_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
+  protected _writeDirection (_inputPinBitmask: number) : Promise<void> { return Promise.resolve(); } ;
+  protected _writeInterruptControl (_interruptBitmask: number) : Promise<void> { return Promise.resolve(); } ;
 
   /**
    * Enable the interrupt detection on the specified GPIO pin.
@@ -284,9 +250,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       this._gpio.unwatch(this._handleInterrupt);
 
       // decrease the use count of the GPIO and unexport it if not used anymore
-      // TODO - URGENT if an interrupt is shared by multiple chip types, how do we manage that?
-      // The notion of an abstract class in typescript is syntactic sugar?
-      // Meaning there's one shared static object for all types?
       this._gpio['ioExpanderUseCount']--;
       if (this._gpio['ioExpanderUseCount'] === 0) {
         if (this._gpioPin !== null) {
@@ -324,29 +287,16 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise}          Promise which gets resolved when the state is written to the IC, or rejected in case of an error.
    */
   private _setNewState (newState?: number): Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+    if (typeof (newState) === 'number') {
+      this._currentState = newState;
+    }
+    // respect inverted with bitmask using XOR
+    let newIcState = this._currentState ^ this._inverted;
 
-      if (typeof (newState) === 'number') {
-        this._currentState = newState;
-      }
+    // set all input pins to high
+    newIcState = newIcState | this._inputPinBitmask;
 
-      // respect inverted with bitmask using XOR
-      let newIcState = this._currentState ^ this._inverted;
-
-      // set all input pins to high
-      newIcState = newIcState | this._inputPinBitmask;
-
-      // callback function for i2c send/write
-      const processWrite = (err: Error): void => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      };
-
-      this._writeState(newIcState, processWrite);
-    });
+    return this._writeState(newIcState);
   }
 
 
@@ -375,38 +325,36 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     this._currentlyPolling = true;
 
     return new Promise((resolve: (value: number) => void, reject: (err: Error) => void) => {
-      // helper functions to process errors and the read data for all IC types
-      const processError = (err: Error): void => {
-        this._currentlyPolling = false;
-        reject(err);
-      };
+      this._readState()
+        .then((readState: number) => {
+          this._currentlyPolling = false;
+          // respect inverted with bitmask using XOR
+          readState = readState ^ this._inverted;
+          const currentState = this._currentState;
 
-      const processRead = (readState: number): void => {
-        this._currentlyPolling = false;
-        // respect inverted with bitmask using XOR
-        readState = readState ^ this._inverted;
-        const currentState = this._currentState;
-
-        // check each input for changes
-        for (let pin = 0; pin < this._pins; pin++) {
-          if (this._directions[pin] !== IOExpander.DIR_IN) {
-            continue; // isn't an input pin
-          }
-          if ((this._currentState >> pin) % 2 !== (readState >> pin) % 2) {
-            // pin changed
-            const value: boolean = ((readState >> pin) % 2 !== 0);
-            this._currentState = this._setStatePin(this._currentState, pin as PinNumber, value);
-            if (noEmit !== pin) {
-              this.emit('input', <IOExpander.InputData<PinNumber>>{ pin: pin, value: value });
+          // check each input for changes
+          for (let pin = 0; pin < this._pins; pin++) {
+            if (this._directions[pin] !== IOExpander.DIR_IN) {
+              continue; // isn't an input pin
+            }
+            if ((this._currentState >> pin) % 2 !== (readState >> pin) % 2) {
+              // pin changed
+              const value: boolean = ((readState >> pin) % 2 !== 0);
+              this._currentState = this._setStatePin(this._currentState, pin as PinNumber, value);
+              if (noEmit !== pin) {
+                this.emit('input', <IOExpander.InputData<PinNumber>>{ pin: pin, value: value });
+              }
             }
           }
-        }
-        if (this._currentState != currentState) {
-          this.emit('poll', this._currentState);
-        }
-        resolve(this._currentState);
-      };
-      this._readState(processError, processRead);
+          if (this._currentState != currentState) {
+            this.emit('poll', this._currentState);
+          }
+          resolve(this._currentState);
+        })
+        .catch((err: Error) => {
+          this._currentlyPolling = false;
+          reject(err);
+        });
     });
   }
 
@@ -429,39 +377,13 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise} Promise which gets resolved when the direction and interrupt control are written to the IC, or rejected in case of an error.
    */
   private _setDirectionAndInterruptControl(inputPinBitmask: number): Promise <void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      // If interrupts are enabled then we need to update the interrupts based on input pin bitmask.
-      if (this._gpio !== null) {
-        const directionResult = (err: Error) : void => {
-          if (err) {
-            reject(err);
-          } else {
-            const enableInterruptResult = (err: Error) : void => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              };
-            };
-            // 2) enable interrupts for input pins only.
-            this._writeInterruptControl(inputPinBitmask, enableInterruptResult);
-          }
-          // 1) update directon
-          this._writeDirection(inputPinBitmask, directionResult);
-        }
-      } else {
-        // interrupts are not active so write direction only.
-        const directionResult = (err: Error) : void => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          };
-        };
-        // 1) update direction
-        this._writeDirection(inputPinBitmask, directionResult);
-      }
-    });
+    // If interrupts are enabled then we need to update the interrupts based on input pin bitmask.
+    if (this._gpio !== null) {
+      return this._writeDirection(inputPinBitmask)
+        .then(() => this._writeInterruptControl(inputPinBitmask));
+    } else {
+      return this._writeDirection(inputPinBitmask);
+    }
   }
 
   /**

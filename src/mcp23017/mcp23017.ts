@@ -7,7 +7,7 @@
  */
 import { I2CBus } from 'i2c-bus';
 
-import { IOExpander, IOEXPANDER_TYPE } from '../shared/ioExpander';
+import { IOExpander } from '../shared/ioExpander';
 
 // By annotating an enum option, you set the value;
 // increments continue from that value:
@@ -133,12 +133,10 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin seprately, or use true/false for all pins at once.
    */
   constructor (i2cBus: I2CBus, address: number, initialState: boolean | number) {
-    super(i2cBus, address, initialState, IOEXPANDER_TYPE.MCP23017);
+    super(i2cBus, address, initialState, 16);
   }
 
-  _getPinCount() : number { return 16; }
-
-  _initializeChip(initialState: number, inputPinBitmask: number) : void {
+  _initializeChipSync (initialState: number, inputPinBitmask: number) : void {
 
     // On startup, Default chip config to use Bank 0 with Interrupt Mirroring and Open-Drain (Active Low) interrupts
     const ioconFlags =
@@ -172,48 +170,68 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([initialState & 0xFF, (initialState >> 8) & 0xFF]));
   }
 
-  _writeState(state: number, writeComplete: (err?: Error) => void) : void {
-    this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([state & 0xFF, (state >> 8) & 0xFF]), (err, bytesWritten) => {
-      if (err || (bytesWritten != 2)) {
-        writeComplete(err);
-      } else {
-        writeComplete();
-      }
-    });
-  }
-
-  _writeDirection(inputPinBitmask: number, writeComplete: (err?: Error) => void) : void {
-    this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.IODIRA, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
-      if (err || (bytesWritten != 2)) {
-        writeComplete(err);
-      } else {
-        writeComplete();
-      }
-    });
-  }
-
-  _readState(readError: (err: Error) => void, readComplete: (readState: number) => void) : void {
-    this._i2cBus.readI2cBlock(this._address, MCP23017_REGISTERS.GPIOA, 2, Buffer.alloc(2), (err, bytesRead, buffer) => {
-      if (err || bytesRead !== 2) {
-        readError(err);
-      } else {
-        // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
-        readComplete(buffer[0] | (buffer[1] << 8));
-      }
-    });
-  }
-
-  _writeInterruptControlSync(interruptBitmask: number) : void {
+  _writeInterruptControlSync (interruptBitmask: number) : void {
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPINTENA, 2, Buffer.from([interruptBitmask & 0xFF, (interruptBitmask >> 8) & 0xFF]));
   };
 
-  _writeInterruptControl(interruptBitmask: number, writeComplete: (err?: Error) => void) : void {
-    this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.GPINTENA, 2, Buffer.from([interruptBitmask & 0xFF, (interruptBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
-      if (err || (bytesWritten != 2)) {
-        writeComplete(err);
-      } else {
-        writeComplete();
-      }
+  _readState () : Promise<number> {
+    return new Promise((resolve: (value: number) => void, reject: (err: Error) => void) => {
+      // We don't use PromisifedBus here as the readI2cBlock does not reject impartial buffer reads.
+      this._i2cBus.readI2cBlock(this._address, MCP23017_REGISTERS.GPIOA, 2, Buffer.alloc(2), (err, bytesRead, buffer) => {
+        if (err) {
+          reject(err);
+        }else if (bytesRead !== 2) {
+          reject(new Error('Incomplete read.'));
+        } else {
+          // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
+          resolve(buffer[0] | (buffer[1] << 8));
+        }
+      });
+    });
+  }
+
+  _writeState (state: number) : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      // We don't use PromisifedBus here as the writeI2cBlock does not reject impartial buffer writes.
+      this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([state & 0xFF, (state >> 8) & 0xFF]), (err, bytesWritten) => {
+        if (err) {
+          reject(err);
+        }else if (bytesWritten !== 2) {
+          reject(new Error('Incomplete write.'));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  _writeInterruptControl (interruptBitmask: number) : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      // We don't use PromisifedBus here as the writeI2cBlock does not reject impartial buffer writes.
+      this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.GPINTENA, 2, Buffer.from([interruptBitmask & 0xFF, (interruptBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
+        if (err) {
+          reject(err);
+        }else if (bytesWritten !== 2) {
+          reject(new Error('Incomplete write.'));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  _writeDirection (inputPinBitmask: number) : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      // We don't use PromisifedBus here as the writeI2cBlock does not reject impartial buffer writes.
+      this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.IODIRA, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
+        if (err) {
+          reject(err);
+        }else if (bytesWritten !== 2) {
+          reject(new Error('Incomplete write.'));
+        } else {
+          resolve();
+        }
+      });
     });
   }
 }

@@ -64,18 +64,18 @@ export interface IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExpander
   on (event: 'input', listener: (data: IOExpander.InputData<PinNumber>) => void): this;
 
   /**
-   * Emit a poll event.
-   * @param event 'poll'
-   * @param value number containing the pin number and the value.
+   * Emit an interrupt event.
+   * @param event 'interrupt'
+   * @param processed boolean 'true' if interrupt was processed or 'false' if processing failed.
    */
-  emit (event: 'poll', value: number): boolean;
+  emit (event: 'interrupt', processed: boolean ): boolean;
 
   /**
-   * Emitted when a poll has completed.
-   * @param event 'poll'
-   * @param listener Eventlistener with a number containing the state of the pins following the poll.
+   * Emitted when an interrupt has completed.
+   * @param event 'interrupt'
+   * @param listener Eventlistener with a boolean containing the state of the interrupt processing.
    */
-  on (event: 'poll', listener: (value: number) => void): this;
+  on (event: 'interrupt', listener: (processed: boolean) => void): this;
 }
 
 
@@ -230,8 +230,12 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * Internal function to handle a GPIO interrupt.
    */
   private _handleInterrupt (): void {
-    // enqueue a poll of current state and ignore any rejected promise
-    this._pollQueue.enqueue(() => this._poll()).catch(() => { /* nothing to do here */ });
+    // Enqueue a poll of current state.
+    // When poll is serviced, notify listeners that a 'processed' interrupt occurred.
+    // When not queued or poll fails, notify listeners of an 'unprocessed' interrupt.
+    this._pollQueue.enqueue(() => this._poll())
+      .then(() => this.emit('interrupt', true))
+      .catch(() => this.emit('interrupt', false));
   }
 
   /**
@@ -327,7 +331,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
           this._currentlyPolling = false;
           // respect inverted with bitmask using XOR
           readState = readState ^ this._inverted;
-          const currentState = this._currentState;
 
           // check each input for changes
           for (let pin = 0; pin < this._pins; pin++) {
@@ -343,9 +346,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
               }
             }
           }
-          if (this._currentState != currentState) {
-            this.emit('poll', this._currentState);
-          }
+
           resolve(this._currentState);
         })
         .catch((err: Error) => {

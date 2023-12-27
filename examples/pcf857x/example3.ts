@@ -106,8 +106,33 @@ pcf.on('input', (data: PCF8574.InputData) => {
   }
 });
 
+let _postInterruptTimeout = null;
+const POST_INTERRUPT_DELAY_TIME_MS = 1500;
+
+function clearPostInterruptTimeout() : void {
+  if (_postInterruptTimeout) {
+    clearTimeout(_postInterruptTimeout);
+    _postInterruptTimeout = null;
+  }
+}
+
+function createPostInterruptTimeout(delayTimeMs: number) : void {
+  clearPostInterruptTimeout();
+  _postInterruptTimeout = setTimeout(() => {
+    console.log('Last interrupt occurred %oms ago.  Will now poll chip', delayTimeMs);
+    pcf.doPoll();
+  }, delayTimeMs);
+}
+
+pcf.on('interrupt', function (processed) {
+  //console.log('interrupt processed:%o', processed);
+  createPostInterruptTimeout(POST_INTERRUPT_DELAY_TIME_MS);
+});
+
 // Handler for clean up on SIGINT (ctrl+c)
 process.on('SIGINT', () => {
+  clearPostInterruptTimeout();
   pcf.removeAllListeners();
   pcf.disableInterrupt();
+  i2cBus.closeSync();
 });

@@ -124,8 +124,7 @@ function createPostInterruptTimeout(delayTimeMs: number) : void {
   }, delayTimeMs);
 }
 
-pcf.on('interrupt', function (processed) {
-  //console.log('interrupt processed:%o', processed);
+pcf.on('interrupt', function (_processed) {
   createPostInterruptTimeout(POST_INTERRUPT_DELAY_TIME_MS);
 });
 

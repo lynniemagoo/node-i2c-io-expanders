@@ -78,8 +78,6 @@ export interface IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExpander
   on (event: 'interrupt', listener: (processed: boolean) => void): this;
 }
 
-
-
 /**
  * Class for handling a PCF8574/PCF8574A or PCF8585 IC.
  * This class shares common code for both types and has to be extend by a class
@@ -141,7 +139,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {I2cBus}         i2cBus       Instance of an opened i2c-bus.
    * @param  {number}         address      The address of the PCF857x IC.
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin separately, or use true/false for all pins at once.
-   * @param  {IOEXPANDER_TYPE}   type         The type of the used IC.
+   * @param  {number}         pinCount     The pinCount either 8 or 16.
    */
   constructor (i2cBus: I2CBus, address: number, initialState: boolean | number, pinCount: 8 | 16) {
     super();

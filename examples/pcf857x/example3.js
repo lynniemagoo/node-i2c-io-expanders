@@ -110,12 +110,11 @@ function clearPostInterruptTimeout() {
 function createPostInterruptTimeout(delayTimeMs) {
     clearPostInterruptTimeout();
     _postInterruptTimeout = setTimeout(function () {
-        console.log('postInterruptTimeout(): will now poll chip after waiting %oms', delayTimeMs);
+        console.log('Last interrupt occurred %oms ago.  Will now poll chip', delayTimeMs);
         pcf.doPoll();
     }, delayTimeMs);
 }
-pcf.on('interrupt', function (processed) {
-    //console.log('interrupt processed:%o', processed);
+pcf.on('interrupt', function (_processed) {
     createPostInterruptTimeout(POST_INTERRUPT_DELAY_TIME_MS);
 });
 // Handler for clean up on SIGINT (ctrl+c)

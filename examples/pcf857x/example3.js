@@ -99,8 +99,28 @@ pcf.on('input', function (data) {
             break;
     }
 });
+var _postInterruptTimeout = null;
+var POST_INTERRUPT_DELAY_TIME_MS = 1500;
+function clearPostInterruptTimeout() {
+    if (_postInterruptTimeout) {
+        clearTimeout(_postInterruptTimeout);
+        _postInterruptTimeout = null;
+    }
+}
+function createPostInterruptTimeout(delayTimeMs) {
+    clearPostInterruptTimeout();
+    _postInterruptTimeout = setTimeout(function () {
+        console.log('Last interrupt occurred %oms ago.  Will now poll chip', delayTimeMs);
+        pcf.doPoll();
+    }, delayTimeMs);
+}
+pcf.on('interrupt', function (_processed) {
+    createPostInterruptTimeout(POST_INTERRUPT_DELAY_TIME_MS);
+});
 // Handler for clean up on SIGINT (ctrl+c)
 process.on('SIGINT', function () {
+    clearPostInterruptTimeout();
     pcf.removeAllListeners();
     pcf.disableInterrupt();
+    i2cBus.closeSync();
 });

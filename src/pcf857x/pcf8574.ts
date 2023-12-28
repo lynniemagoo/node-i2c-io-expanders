@@ -7,7 +7,7 @@
  */
 import { I2CBus } from 'i2c-bus';
 
-import { IOExpander, IOEXPANDER_TYPE } from '../shared/ioExpander';
+import { IOExpander } from '../shared/ioExpander';
 
 /**
  * Namespace for types for PCF8574
@@ -47,12 +47,10 @@ export class PCF8574 extends IOExpander<IOExpander.PinNumber8> {
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin seprately, or use true/false for all pins at once.
    */
   constructor (i2cBus: I2CBus, address: number, initialState: boolean | number) {
-    super(i2cBus, address, initialState, IOEXPANDER_TYPE.PCF8574);
+    super(i2cBus, address, initialState, 8);
   }
 
-  _getPinCount() : number { return 8; }
-
-  _initializeChip(initialState: number, _inputPinBitmask: number) : void {
+  _initializeChipSync(initialState: number, _inputPinBitmask: number) : void {
     this._i2cBus.i2cWriteSync(this._address, 1, Buffer.from([initialState & 0xFF]));
   }
 

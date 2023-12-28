@@ -7,7 +7,7 @@
  */
 import { I2CBus } from 'i2c-bus';
 
-import { IOExpander, IOEXPANDER_TYPE } from '../shared/ioExpander';
+import { IOExpander } from '../shared/ioExpander';
 
 // By annotating an enum option, you set the value;
 // increments continue from that value:
@@ -66,12 +66,10 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin seprately, or use true/false for all pins at once.
    */
   constructor (i2cBus: I2CBus, address: number, initialState: boolean | number) {
-    super(i2cBus, address, initialState, IOEXPANDER_TYPE.CAT9555);
+    super(i2cBus, address, initialState, 16);
   }
 
-  _getPinCount() : number { return 16; }
-
-  _initializeChip(initialState: number, inputPinBitmask: number) : void {
+  _initializeChipSync(initialState: number, inputPinBitmask: number) : void {
 
     // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
     this._i2cBus.writeI2cBlockSync(this._address, CAT9555_REGISTERS.POL_INV_0, 2, Buffer.from([0x00, 0x00]));

@@ -188,15 +188,15 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     this._initializeChipSync(initialState, this._inputPinBitmask);
   }
 
-  protected abstract _initializeChipSync(initialState: number, inputPinBitmask: number) : void;
-  protected _writeInterruptControlSync(_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
+  protected abstract _initializeChipSync (initialState: number, inputPinBitmask: number) : void;
+  protected _writeInterruptControlSync (_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
 
   /**
    * Read the pin state from the IC.
    * All chips require this method.
    * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is read from the chip, or rejected in case of an error.
    */
-  protected abstract _readState() : Promise<number>;
+  protected abstract _readState () : Promise<number>;
 
   /**
    * Write the internal state to the IC.
@@ -204,7 +204,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {number}  state.
    * @return {Promise} Promise which gets resolved when the state is written to the IC, or rejected in case of an error.
    */
-  protected abstract _writeState(state: number) : Promise<void>;
+  protected abstract _writeState (state: number) : Promise<void>;
 
   /**
    * Write the pin direction assignment to the IC.
@@ -212,7 +212,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {number}  inputPinBitmask.
    * @return {Promise} Promise which gets resolved when the direction is written to the IC, or rejected in case of an error.
    */
-  protected _writeDirection(_inputPinBitmask: number) : Promise<void> { return Promise.resolve(); }
+  protected _writeDirection (_inputPinBitmask: number) : Promise<void> { return Promise.resolve(); }
 
   /**
    * Write the interrupt control to the IC.
@@ -221,7 +221,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {number}  interruptBitmask.
    * @return {Promise} Promise which gets resolved when the interrupt control is written to the IC, or rejected in case of an error.
    */
-  protected _writeInterruptControl(_interruptBitmask: number) : Promise<void> { return Promise.resolve(); }
+  protected _writeInterruptControl (_interruptBitmask: number) : Promise<void> { return Promise.resolve(); }
 
   /**
    * Enable the interrupt detection on the specified GPIO pin.

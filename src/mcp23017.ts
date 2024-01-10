@@ -7,7 +7,7 @@
  */
 import { I2CBus } from 'i2c-bus';
 
-import { IOExpander } from './shared/ioExpander';
+import { IOExpander } from './ioExpander';
 
 // By annotating an enum option, you set the value;
 // increments continue from that value:
@@ -136,6 +136,33 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     super(i2cBus, address, initialState, 16);
   }
 
+  _initializeChip () : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      // On startup, Default chip config to use Bank 0 with Interrupt Mirroring and Open-Drain (Active Low) interrupts
+      const ioconFlags =
+        MCP23017_IOCON_FLAGS.DEFAULT |
+        MCP23017_IOCON_FLAGS.INT_MIRROR_ON |
+        MCP23017_IOCON_FLAGS.INT_OPEN_DRAIN_ENABLED
+
+      this._writeChipRegister(MCP23017_REGISTERS.IOCONA, 1, ioconFlags)
+        // Disable all interrupts.
+        .then(() => this._writeChipRegister(MCP23017_REGISTERS.GPINTENA, 2, 0x00))
+        // Set pins marked as input.
+        .then(() => this._writeChipRegister(MCP23017_REGISTERS.IODIRA, 2, this._inputPinBitmask))
+        // Force all pins to Pull-Up.
+        .then(() => this._writeChipRegister(MCP23017_REGISTERS.GPPUA, 2, 0xFFFF))
+        // Force no Polarity Invert as we will manage this in software with the _inverted bitField.
+        .then(() => this._writeChipRegister(MCP23017_REGISTERS.IPOLA, 2, 0x00))
+        // Set interrupt change default values to 0.
+        .then(() => this._writeChipRegister(MCP23017_REGISTERS.INTCONA, 2, 0x00))
+        // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
+        .then(() => this._writeChipRegister(MCP23017_REGISTERS.OLATA, 2, this._currentState))
+        .then(() => resolve())
+        .catch((err: Error) => reject(err));
+    });
+  }
+
+  /*
   _initializeChipSync (initialState: number, inputPinBitmask: number) : void {
 
     // On startup, Default chip config to use Bank 0 with Interrupt Mirroring and Open-Drain (Active Low) interrupts
@@ -170,56 +197,25 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([initialState & 0xFF, (initialState >> 8) & 0xFF]));
   }
 
+
   _writeInterruptControlSync (interruptBitmask: number) : void {
     this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPINTENA, 2, Buffer.from([interruptBitmask & 0xFF, (interruptBitmask >> 8) & 0xFF]));
   }
+  */
 
   _readState () : Promise<number> {
-    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
-      this._i2cBus.readI2cBlock(this._address, MCP23017_REGISTERS.GPIOA, 2, Buffer.alloc(2), (err, bytesRead, buffer) => {
-        if (err || bytesRead !== 2) {
-          reject(err);
-        } else {
-          // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
-          resolve(buffer[0] | (buffer[1] << 8));
-        }
-      });
-    });
+    return this._readChipRegister(MCP23017_REGISTERS.GPIOA, 2);
   }
 
   _writeState (state: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([state & 0xFF, (state >> 8) & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChipRegister(MCP23017_REGISTERS.OLATA, 2, state);
   }
 
   _writeDirection (inputPinBitmask: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.IODIRA, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChipRegister(MCP23017_REGISTERS.IODIRA, 2, inputPinBitmask);
   }
 
   _writeInterruptControl(interruptBitmask: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.writeI2cBlock(this._address, MCP23017_REGISTERS.GPINTENA, 2, Buffer.from([interruptBitmask & 0xFF, (interruptBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChipRegister(MCP23017_REGISTERS.GPINTENA, 2, interruptBitmask);
   }
 }

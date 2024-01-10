@@ -109,16 +109,16 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   protected _pins: 8 | 16;
 
   /** Direction of each pin. By default all pin directions are undefined. */
-  private _directions: Array<IOExpander.PinDirection>;
+  protected _directions: Array<IOExpander.PinDirection>;
 
   /** Bitmask for all input pins. Used to set all input pins to high on the IC. */
-  private _inputPinBitmask: number = 0;
+  protected _inputPinBitmask: number = 0;
 
   /** Bitmask for inverted pins. */
-  private _inverted: number;
+  protected _inverted: number;
 
   /** Bitmask representing the current state of the pins. */
-  private _currentState: number;
+  protected _currentState: number;
 
   /** Flag if we are currently polling changes from the CAT9555 IC. */
   private _currentlyPolling: boolean = false;
@@ -184,12 +184,126 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     // CAT9555 Page 10 of datasheet - The default values of the Configuration Port0/Configuration Port1 registers are all 1's meaning all 16 pins are input by default.
     // MCP2017 Page 16 of datasheet - The default values of IODIRA/IODIRB are all 1's meaning all 16 pins are input by default.
     this._inputPinBitmask = Math.pow(2, this._pins) - 1;
-
-    this._initializeChipSync(initialState, this._inputPinBitmask);
   }
 
-  protected abstract _initializeChipSync (initialState: number, inputPinBitmask: number) : void;
-  protected _writeInterruptControlSync (_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
+  /**
+   * Asynchronously initialize the chip post construction.
+   * @return {Promise} Promise which gets resolved when done, or rejected in case of an error.
+   */
+  public initialize () : Promise<void> {
+    return this._initializeChip();
+  }
+
+  /**
+   * Helper method to read an 8 or 16 bit value from the IC.
+   * @param  {number}  Count of types to read.  1 or 2
+   * @param  {boolean} If count is 2, optional boolean that determines if first byte read is the msb of a 16 bit value.  Default is false.  Ignored if count === 1
+   * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is read from the chip, or rejected in case of an error.
+   */
+  protected _readChip (byteCount: 1 | 2, msbFirst?: boolean) : Promise<number> {
+    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
+      this._i2cBus.i2cRead(this._address, byteCount, Buffer.alloc(byteCount), (err, bytesRead, buffer) => {
+        if (err || bytesRead !== byteCount) {
+          reject(err);
+        } else {
+          if (byteCount === 2) {
+            // Readstate is 16 bits.
+            // if msb then buffer[0] is msb of 16 bit value.  otherwise, buffer[1] is msb of 16 bit value.
+            resolve(!!msbFirst ? (buffer[0] << 8) | buffer[1] : buffer[0] | (buffer[1] << 8));
+          } else {
+            resolve(buffer[0]);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Helper method to read an 8 or 16 bit value from the IC.
+   * @param  {number}  Register of the chip that is target of the write.
+   * @param  {number}  Count of types to read.  1 or 2
+   * @param  {boolean} If count is 2, optional boolean that determines if first byte read is the msb of a 16 bit value.  Default is false.  Ignored if count === 1
+   * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is read from the chip, or rejected in case of an error.
+   */
+  protected _readChipRegister (register: number, byteCount: 1 | 2, msbFirst?: boolean) : Promise<number> {
+    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
+      this._i2cBus.readI2cBlock(this._address, register & 0xFF, byteCount, Buffer.alloc(byteCount), (err, bytesRead, buffer) => {
+        if (err || bytesRead !== byteCount) {
+          reject(err);
+        } else {
+          if (byteCount === 2) {
+            // Readstate is 16 bits.
+            // if msbFirst then buffer[0] is msb of 16 bit value.  otherwise, buffer[1] is msb of 16 bit value.
+            resolve(!!msbFirst ? ((buffer[0] << 8) | buffer[1]) : (buffer[0] | (buffer[1] << 8)));
+          } else {
+            resolve(buffer[0]);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Helper method to write an 8 or 16 bit value to the IC.
+   * @param  {number}  Register of the chip that is target of the write.
+   * @param  {number}  Count of types to write.  1 or 2
+   * @param  {number}  8 or 16 bit value to write (bit count determined by byteCount).
+   * @param  {boolean} If count is 2, optional boolean that determines if first byte written is the msb of a 16 bit value.  Default is false.  Ignored if count === 1
+   * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is written to the chip, or rejected in case of an error.
+   */
+  protected _writeChipRegister (register: number, byteCount: 1 | 2, value: number, msbFirst?: boolean) : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      let arr: number[];
+      if (byteCount === 2) {
+        arr = !!msbFirst ? [(value >> 8) & 0xFF, value & 0xFF] : [value & 0xFF, (value >> 8) & 0xFF];
+      } else {
+        arr = [value & 0xFF];
+      }
+      this._i2cBus.writeI2cBlock(this._address, register & 0xFF, byteCount, Buffer.from(arr), (err, bytesWritten) => {
+        if (err || bytesWritten !== byteCount) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Helper method to write an 8 or 16 bit value to the IC.
+   * @param  {number}  Count of types to write.  1 or 2
+   * @param  {number}  8 or 16 bit value to write (bit count determined by byteCount).
+   * @param  {boolean} If count is 2, optional boolean that determines if first byte written is the msb of a 16 bit value.  Default is false.  Ignored if count === 1
+   * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is written to the chip, or rejected in case of an error.
+   */
+  protected _writeChip (byteCount: 1 | 2, value: number, msbFirst?: boolean) : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      let arr: number[];
+      if (byteCount === 2) {
+        arr = !!msbFirst ? [(value >> 8) & 0xFF, value & 0xFF] : [value & 0xFF, (value >> 8) & 0xFF];
+      } else {
+        arr = [value & 0xFF];
+      }
+      this._i2cBus.i2cWrite(this._address, byteCount, Buffer.from(arr), (err, bytesWritten) => {
+        if (err || bytesWritten !== byteCount) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+
+  /**
+   * Initialize the IC.
+   * All chips require this method.
+   * @return {Promise} Promise which gets resolved when done, or rejected in case of an error.
+   */
+  protected abstract _initializeChip () : Promise<void>;
+
+  //protected abstract _initializeChipSync (initialState: number, inputPinBitmask: number) : void;
+  //protected _writeInterruptControlSync (_interruptBitmask: number) : void { /* Nothing to do for most chips */ } ;
 
   /**
    * Read the pin state from the IC.
@@ -229,6 +343,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param {number} gpioPin BCM number of the pin, which will be used for the interrupts from the PCF8574/8574A/PCF8575 IC.
    * @throws Error if interrupt is already enabled.
    */
+  /*
   public enableInterrupt (gpioPin: number): void {
     if (this._gpio !== null) {
       throw new Error('GPIO interrupt already enabled.');
@@ -251,6 +366,42 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     this._gpioPin = gpioPin;
     this._gpio.watch(this._handleInterrupt);
   }
+  */
+  /**
+   * Enable the interrupt detection on the specified GPIO pin.
+   * You can use one GPIO pin for multiple instances of the IOExpander class.
+   * @param {number} gpioPin BCM number of the pin, which will be used for the interrupts from the PCF8574/8574A/PCF8575 IC.
+   * @return {Promise}          Promise which gets resolved when complete, or rejected in case of an error.
+   */
+  public enableInterrupt (gpioPin: number): Promise<void> {
+    if (this._gpio !== null) {
+      // Must first call disable if previously enabled.
+      Promise.reject(new Error('GPIO interrupt already enabled.'));
+    }
+
+    return new Promise((resolve: () => void, reject: (err:Error) => void) => {
+      if (IOExpander._allInstancesUsedGpios[gpioPin]) {
+        // Already initialized GPIO
+        this._gpio = IOExpander._allInstancesUsedGpios[gpioPin];
+        this._gpio['ioExpanderUseCount']++;
+      } else {
+        // Init the GPIO as input with falling edge,
+        // because the chip will lower the interrupt line on changes
+        this._gpio = new Gpio(gpioPin, 'in', 'falling');
+        this._gpio['ioExpanderUseCount'] = 1;
+        IOExpander._allInstancesUsedGpios[gpioPin] = this._gpio;
+      }
+      // Enable chip interrupts for input pins.
+      this._writeInterruptControl(this._inputPinBitmask)
+        .then(() => {
+          // cache this value so we can properly nullify entry in static_allInstancesUsedGpios object during disableInterrupt calls.
+          this._gpioPin = gpioPin;
+          this._gpio.watch(this._handleInterrupt);
+          resolve();
+        })
+        .catch((err: Error) => reject(err));
+    });
+  }
 
   /**
    * Internal function to handle a GPIO interrupt.
@@ -267,7 +418,42 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /**
    * Disable the interrupt detection.
    * This will unexport the interrupt GPIO, if it is not used by an other instance of this class.
+   * @return {Promise}          Promise which gets resolved when complete, or rejected in case of an error.
    */
+  public disableInterrupt (): Promise<void> {
+    if (this._gpio === null) {
+      // Nothing to do.
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve: () => void, reject: (err:Error) => void) => {
+      // Disable all chip interrupts.
+      this._writeInterruptControl(0x00)
+        .then(() => {
+          // remove the interrupt handling
+          this._gpio.unwatch(this._handleInterrupt);
+          // Release the used GPIO
+          // Decrease the use count of the GPIO and unexport it if not used anymore
+          this._gpio['ioExpanderUseCount']--;
+          if (this._gpio['ioExpanderUseCount'] === 0) {
+            if (this._gpioPin !== null) {
+              // Delete the registered gpio from our allInstancesUsedGpios object as reference count is 0 and gpio is being unexported
+              delete IOExpander._allInstancesUsedGpios[this._gpioPin];
+            }
+            this._gpio.unexport();
+          }
+          this._gpioPin = this._gpio = null;
+          resolve();
+        })
+        .catch((err:Error) => reject(err));
+    });
+  }
+
+  /**
+   * Disable the interrupt detection.
+   * This will unexport the interrupt GPIO, if it is not used by an other instance of this class.
+   */
+  /*
   public disableInterrupt (): void {
     // release the used GPIO
     if (this._gpio !== null) {
@@ -289,7 +475,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       this._gpio = null;
     }
   }
-
+  */
   /**
    * Helper function to set/clear one bit in a bitmask.
    * @param  {number}    current The current bitmask.

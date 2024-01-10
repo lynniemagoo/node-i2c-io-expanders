@@ -50,32 +50,21 @@ export class PCF8574 extends IOExpander<IOExpander.PinNumber8> {
     super(i2cBus, address, initialState, 8);
   }
 
+  _initializeChip () : Promise<void> {
+    return this._writeChip(2, this._currentState);
+  }
+
+  /*
   _initializeChipSync (initialState: number, _inputPinBitmask: number) : void {
     this._i2cBus.i2cWriteSync(this._address, 1, Buffer.from([initialState & 0xFF]));
   }
+  */
 
   _readState () : Promise<number> {
-    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
-      this._i2cBus.i2cRead(this._address, 1, Buffer.alloc(1), (err: Error, bytesRead: number, buffer: Buffer) => {
-        if (err || bytesRead !== 1) {
-          reject(err);
-        } else {
-          // Readstate is 8 bits.  Pins 0-7 are in byte.
-          resolve(buffer[0] | (buffer[1] << 8));
-        }
-      });
-    });
+    return this._readChip(1);
   }
 
   _writeState (state: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.i2cWrite(this._address, 1, Buffer.from([state & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChip(1, state);
   }
 }

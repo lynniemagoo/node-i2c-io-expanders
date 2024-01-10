@@ -52,32 +52,21 @@ export class PCF8575 extends IOExpander<IOExpander.PinNumber16> {
     super(i2cBus, address, initialState, 16);
   }
 
+  _initializeChip () : Promise<void> {
+    return this._writeChip(2, this._currentState);
+  }
+
+  /*
   _initializeChipSync (initialState: number, _inputPinBitmask: number) : void {
     this._i2cBus.i2cWriteSync(this._address, 2, Buffer.from([initialState & 0xFF, (initialState >>> 8) & 0xFF]));
   }
+  */
 
   _readState () : Promise<number> {
-    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
-      this._i2cBus.i2cRead(this._address, 2, Buffer.alloc(2), (err: Error, bytesRead: number, buffer: Buffer) => {
-        if (err || bytesRead !== 2) {
-          reject(err);
-        } else {
-          // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
-          resolve(buffer[0] | (buffer[1] << 8));
-        }
-      });
-    });
+    return this._readChip(2);
   }
 
   _writeState (state: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.i2cWrite(this._address, 2, Buffer.from([state & 0xFF, (state >>> 8) & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChip(2, state);
   }
 }

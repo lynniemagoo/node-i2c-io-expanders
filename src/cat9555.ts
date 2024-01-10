@@ -69,6 +69,20 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
     super(i2cBus, address, initialState, 16);
   }
 
+  _initializeChip () : Promise<void> {
+    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+      // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
+      this._writeChipRegister(CAT9555_REGISTERS.POL_INV_0, 2, 0x00)
+        // Set pins marked as input.
+        .then(() => this._writeChipRegister(CAT9555_REGISTERS.CON_PORT_0, 2, this._inputPinBitmask))
+        // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
+        .then(() => this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, this._currentState))
+        .then(() => resolve())
+        .catch((err: Error) => reject(err));
+    });
+  }
+
+  /*
   _initializeChipSync (initialState: number, inputPinBitmask: number) : void {
 
     // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
@@ -79,41 +93,17 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
     // On startup, Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
     this._i2cBus.writeI2cBlockSync(this._address, CAT9555_REGISTERS.OUTPUT_PORT_0, 2, Buffer.from([initialState & 0xFF, (initialState >> 8) & 0xFF]));
   }
+  */
 
   _readState () : Promise<number> {
-    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
-      this._i2cBus.readI2cBlock(this._address, CAT9555_REGISTERS.INPUT_PORT_0, 2, Buffer.alloc(2), (err, bytesRead, buffer) => {
-        if (err || bytesRead !== 2) {
-          reject(err);
-        } else {
-          // Readstate is 16 bit reverse of byte ordering.  Pins 0-7 are in byte 0.  Pins 8-15 are in byte 1.
-          resolve(buffer[0] | (buffer[1] << 8));
-        }
-      });
-    });
+    return this._readChipRegister(CAT9555_REGISTERS.INPUT_PORT_0, 2);
   }
 
   _writeState (state: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.writeI2cBlock(this._address, CAT9555_REGISTERS.OUTPUT_PORT_0, 2, Buffer.from([state & 0xFF, (state >> 8) & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, state);
   }
 
   _writeDirection (inputPinBitmask: number) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      this._i2cBus.writeI2cBlock(this._address, CAT9555_REGISTERS.CON_PORT_0, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]), (err, bytesWritten) => {
-        if (err || (bytesWritten != 2)) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    return this._writeChipRegister(CAT9555_REGISTERS.CON_PORT_0, 2, inputPinBitmask);
   }
 }

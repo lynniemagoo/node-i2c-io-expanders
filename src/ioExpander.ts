@@ -138,8 +138,11 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /** Flag if we are currently polling changes from the IC. */
   private _currentlyPolling: boolean = false;
 
-  /** PromiseQueue to handle requested polls in order. */
-  private _pollQueue: PromiseQueue = new PromiseQueue(3);
+  /** PromiseQueue to handle requested I2C actions in order. */
+  private _queue: PromiseQueue = new PromiseQueue();
+
+  /** Number of polls currently in the queue */
+  private _queuePollCount: number = 0;
 
   /** Pin number of GPIO to detect interrupts, or null by default. */
   private _gpioPin: number | null = null;
@@ -403,7 +406,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     // Enqueue a poll of current state.
     // When poll is serviced, notify listeners that a 'processed' interrupt occurred.
     // When not queued or poll fails, notify listeners of an 'unprocessed' interrupt.
-    this._pollQueue.enqueue(() => this._poll())
+    this._enqueuePoll()
       .then(() => this.emit('interrupt', true))
       .catch(() => this.emit('interrupt', false));
   }
@@ -482,7 +485,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @returns `true` if we are currently polling.
    */
   public isPolling (): boolean {
-    return !this._pollQueue.isEmpty();
+    return !this._queue.isEmpty();
   }
 
 
@@ -491,10 +494,10 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * If a change on an input is detected, an "input" Event will be emitted with a data object containing the "pin" and the new "value".
    * This is called if an interrupt occurred, or if doPoll() is called manually.
    * Additionally this is called if a new input is defined to read the current state of this pin.
-   * @param {PinNumber} noEmit (optional) Pin number of a pin which should not trigger an event. (used for getting the current state while defining a pin as input)
+   * @param {PinNumber | null} noEmit (optional) Pin number of a pin which should not trigger an event. (used for getting the current state while defining a pin as input)
    * @return {Promise<number>} - value representing pin states following any I2C read/write and update of the internal state.
    */
-  private async _poll (noEmit?: PinNumber): Promise<number> {
+  private async _poll (noEmit?: PinNumber | null): Promise<number> {
     if (this._currentlyPolling) {
       return Promise.reject('An other poll is in progress');
     }
@@ -532,15 +535,38 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   }
 
   /**
+   * Enqueue a poll to the queue of I2C operations.
+   *
+   * There can be up to 3 polls queued.
+   * When trying to enqueue a poll if already 3 polls are queued, the Promise will be rejected.
+   * @param {PinNumber | null} noEmit (optional) Pin number of a pin which should not trigger an event. (used for getting the current state while defining a pin as input)
+   * @param {boolean} ignoreMaxPollCount Ignore the maximum of 3 polls in queue and enqueue anyways.
+   * @returns {Promise<number>} Promise resolving to the pin states after successfull poll.
+   */
+  private async _enqueuePoll (noEmit?: PinNumber | null, ignoreMaxPollCount?: boolean): Promise<number> {
+    if (!ignoreMaxPollCount && this._queuePollCount >= 3) {
+      throw new Error('To many polls in queue');
+    }
+
+    this._queuePollCount++;
+    return this._queue.enqueue(async () => {
+      const v = await this._poll(noEmit);
+      this._queuePollCount--;
+      return v;
+    });
+  }
+
+  /**
    * Manually poll changed inputs from the PCF857x IC.
    * If a change on an input is detected, an "input" Event will be emitted with a data object containing the "pin" and the new "value".
    * This have to be called frequently enough if you don't use a GPIO for interrupt detection.
    * If you poll again before the last poll was completed, the new poll will be queued up the be executed after the current poll.
    * If you poll again while also a poll is queued, this will be rejected.
+   * @param {boolean} ignoreMaxPollCount Ignore the maximum of 3 polls in queue and enqueue anyways.
    * @return {Promise<number>} - value representing pin states following any I2C read/write and update of the internal state.
    */
-  public doPoll (): Promise<number> {
-    return this._pollQueue.enqueue(() => this._poll());
+  public doPoll (ignoreMaxPollCount?: boolean): Promise<number> {
+    return this._enqueuePoll(null, ignoreMaxPollCount);
   }
 
   /**
@@ -568,7 +594,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     // ... and call _setNewState() to activate the high level on the input pin ...
     await this._setNewState();
     // ... and then poll all current inputs with noEmit on this pin to suppress the event
-    return this._pollQueue.enqueue(() => this._poll(pin));
+    return this._enqueuePoll(pin, true);
   }
 
 

@@ -57,7 +57,7 @@ export namespace CAT9555 {
 export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
 
   /** Number of pins the IC has. */
-  protected _pins: 16 = 16;
+  protected _pins = <const>16;
 
   /**
    * Constructor for a new CAT9555 instance.

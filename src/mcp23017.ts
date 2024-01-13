@@ -124,7 +124,7 @@ export namespace MCP23017 {
 export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
 
   /** Number of pins the IC has. */
-  protected _pins: 16 = 16;
+  protected _pins = <const>16;
 
   /**
    * Constructor for a new MCP23017 instance.

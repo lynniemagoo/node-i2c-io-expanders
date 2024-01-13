@@ -1,7 +1,7 @@
 /*
  * Node.js PCF8575
  *
- * Copyright (c) 2017-2023 Peter M�ller <peter@crycode.de> (https://crycode.de)
+ * Copyright (c) 2017-2023 Peter Müller <peter@crycode.de> (https://crycode.de)
  *               2022 - PCF8575 support inspired by Lyndel McGee <lynniemagoo@yahoo.com>
  *
  * Node.js module for controlling each pin of a PCF8575 I2C port expander IC.
@@ -40,7 +40,7 @@ export namespace PCF8575 {
 export class PCF8575 extends IOExpander<IOExpander.PinNumber16> {
 
   /** Number of pins the IC has. */
-  protected _pins: 16 = 16;
+  protected _pins = <const>16;
 
   /**
    * Constructor for a new PCF8575 instance.

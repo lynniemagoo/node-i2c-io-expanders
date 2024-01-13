@@ -56,6 +56,9 @@ export namespace CAT9555 {
  */
 export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
 
+  /** Number of pins the IC has. */
+  protected _pins: 16 = 16;
+
   /**
    * Constructor for a new CAT9555 instance.
    * If you use this IC with one or more input pins, you have to call ...
@@ -63,23 +66,18 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
    *  b) doPoll() frequently enough to detect input changes with manually polling.
    * @param  {I2cBus}         i2cBus       Instance of an opened i2c-bus.
    * @param  {number}         address      The address of the CAT9555 IC.
-   * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin seprately, or use true/false for all pins at once.
    */
-  constructor (i2cBus: I2CBus, address: number, initialState: boolean | number) {
-    super(i2cBus, address, initialState, 16);
+  constructor (i2cBus: I2CBus, address: number) {
+    super(i2cBus, address);
   }
 
-  _initializeChip () : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
-      this._writeChipRegister(CAT9555_REGISTERS.POL_INV_0, 2, 0x00)
-        // Set pins marked as input.
-        .then(() => this._writeChipRegister(CAT9555_REGISTERS.CON_PORT_0, 2, this._inputPinBitmask))
-        // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
-        .then(() => this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, this._currentState))
-        .then(() => resolve())
-        .catch((err: Error) => reject(err));
-    });
+  protected async _initializeChip () : Promise<void> {
+    // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
+    await this._writeChipRegister(CAT9555_REGISTERS.POL_INV_0, 2, 0x00);
+    // Set pins marked as input.
+    await this._writeChipRegister(CAT9555_REGISTERS.CON_PORT_0, 2, this._inputPinBitmask);
+    // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
+    await this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, this._currentState);
   }
 
   /*
@@ -95,15 +93,15 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
   }
   */
 
-  _readState () : Promise<number> {
+  protected _readState () : Promise<number> {
     return this._readChipRegister(CAT9555_REGISTERS.INPUT_PORT_0, 2);
   }
 
-  _writeState (state: number) : Promise<void> {
+  protected _writeState (state: number) : Promise<void> {
     return this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, state);
   }
 
-  _writeDirection (inputPinBitmask: number) : Promise<void> {
+  protected _writeDirection (inputPinBitmask: number) : Promise<void> {
     return this._writeChipRegister(CAT9555_REGISTERS.CON_PORT_0, 2, inputPinBitmask);
   }
 }

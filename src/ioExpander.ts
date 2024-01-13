@@ -191,6 +191,20 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   }
 
   /**
+   * Make a clean shutdown.
+   *
+   * This will:
+   * - remove all event listeners
+   * - disable the interrupt, if used
+   *
+   * @return {Promise} Promise which gets resolved when done.
+   */
+  public async close(): Promise<void> {
+    this.removeAllListeners();
+    await this.disableInterrupt();
+  }
+
+  /**
    * Helper method to read an 8 or 16 bit value from the IC.
    * @param  {number}  Count of types to read.  1 or 2
    * @param  {boolean} If count is 2, optional boolean that determines if first byte read is the msb of a 16 bit value.  Default is false.  Ignored if count === 1

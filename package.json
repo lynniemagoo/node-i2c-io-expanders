@@ -21,30 +21,31 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
-    "node": ">=10.0.0"
+    "node": ">=18.0.0"
   },
   "author": "Lyndel McGee <lynniemagoo@yahoo.com>",
+  "contributors": [
+    "Peter Müller <peter@crycode.de> (https://crycode.de)"
+  ],
   "license": "GPL-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/lynniemagoo/node-i2c-io-expanders.git"
   },
   "bugs": {
-    "url": "github.com/lynniemagoo/node-i2c-io-expanders/issues"
+    "url": "https://github.com/lynniemagoo/node-i2c-io-expanders/issues"
   },
   "devDependencies": {
-    "pcf8574": "^3.1.0",
     "@types/i2c-bus": "^5.1.0",
-    "@types/node": "^16.9.1",
+    "@types/node": "^20.11.0",
     "@types/onoff": "^4.1.0",
-    "@typescript-eslint/eslint-plugin": "^4.31.1",
-    "@typescript-eslint/parser": "^4.31.1",
-    "eslint": "^7.32.0",
-    "typescript": "^4.4.3"
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "i2c-bus": "^5.2.3",
-    "onoff": "^6.0.3",
-    "pcf8574": "^3.1.0"
+    "onoff": "^6.0.3"
   }
 }

@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "module": "commonjs",
-    "target": "es2018",
+    "target": "es2020",
     "noImplicitAny": false,
     "removeComments": false,
     "outDir": "dist"

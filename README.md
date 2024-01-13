@@ -244,7 +244,5 @@ To get the current value call doPoll() first, if you're not using interrupts.
 
 Licensed under GPL Version 2
 
-Copyright (c) 2023 Lyndel McGee lynniemagoo@yahoo.com
-PCF8574/PCF8575
-Copyright (c) 2017-2023 Peter Müller <peter@crycode.de> (<https://crycode.de/>)  
-
+Copyright (c) 2023-2024 Lyndel McGee <lynniemagoo@yahoo.com>
+Copyright (c) 2017-2024 Peter Müller <peter@crycode.de> (<https://crycode.de/>)  

@@ -60,6 +60,7 @@ module.exports = {
         '@typescript-eslint/no-inferrable-types': 'off',
         '@typescript-eslint/no-namespace': 'off',
         '@typescript-eslint/no-non-null-assertion': 'off', // This is necessary for Map.has()/get()!
+        '@typescript-eslint/no-unsafe-declaration-merging': 'off',
         'no-var': 'error',
         'prefer-const': 'error',
         'no-trailing-spaces': 'warn',

@@ -43,6 +43,21 @@ export namespace IOExpander {
      */
     value: boolean;
   }
+
+  /**
+   * Internal store to track GPIO usage.
+   */
+  export interface UsedGpioData {
+    /**
+     * The GPIO instance.
+     */
+    gpio: Gpio;
+
+    /**
+     * Counter how often this GPIO is used.
+     */
+    useCount: number;
+  }
 }
 
 /**
@@ -96,13 +111,13 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /** Constant for output pin direction. */
   public static readonly DIR_OUT = 0;
 
-  /** Object containing all GPIOs used by any CAT9555 instance. */
-  private static _allInstancesUsedGpios: Record<number, Gpio> = {};
+  /** Object containing all GPIOs used by any instance. */
+  private static _allInstancesUsedGpios: Record<number, IOExpander.UsedGpioData> = {};
 
   /** The instance of the i2c-bus, which is used for the I2C communication. */
   protected _i2cBus: I2CBus;
 
-  /** The address of the CAT9555 IC. */
+  /** The address of the IC. */
   protected _address: number;
 
   /** Number of pins the IC has. */
@@ -120,7 +135,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /** Bitmask representing the current state of the pins. */
   protected _currentState: number;
 
-  /** Flag if we are currently polling changes from the CAT9555 IC. */
+  /** Flag if we are currently polling changes from the IC. */
   private _currentlyPolling: boolean = false;
 
   /** PromiseQueue to handle requested polls in order. */
@@ -351,36 +366,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * Enable the interrupt detection on the specified GPIO pin.
    * You can use one GPIO pin for multiple instances of the IOExpander class.
    * @param {number} gpioPin BCM number of the pin, which will be used for the interrupts from the PCF8574/8574A/PCF8575 IC.
-   * @throws Error if interrupt is already enabled.
-   */
-  /*
-  public enableInterrupt (gpioPin: number): void {
-    if (this._gpio !== null) {
-      throw new Error('GPIO interrupt already enabled.');
-    }
-
-    if (IOExpander._allInstancesUsedGpios[gpioPin]) {
-      // use already initialized GPIO
-      this._gpio = IOExpander._allInstancesUsedGpios[gpioPin];
-      this._gpio['ioExpanderUseCount']++;
-    } else {
-      // init the GPIO as input with falling edge,
-      // because the chip will lower the interrupt line on changes
-      this._gpio = new Gpio(gpioPin, 'in', 'falling');
-      this._gpio['ioExpanderUseCount'] = 1;
-      IOExpander._allInstancesUsedGpios[gpioPin] = this._gpio;
-    }
-    // Enable chip interrupts for input pins.
-    this._writeInterruptControlSync(this._inputPinBitmask);
-    // cache this value so we can properly nullify entry in static_allInstancesUsedGpios object during disableInterrupt calls.
-    this._gpioPin = gpioPin;
-    this._gpio.watch(this._handleInterrupt);
-  }
-  */
-  /**
-   * Enable the interrupt detection on the specified GPIO pin.
-   * You can use one GPIO pin for multiple instances of the IOExpander class.
-   * @param {number} gpioPin BCM number of the pin, which will be used for the interrupts from the PCF8574/8574A/PCF8575 IC.
    * @return {Promise}          Promise which gets resolved when complete, or rejected in case of an error.
    */
   public async enableInterrupt (gpioPin: number): Promise<void> {
@@ -391,14 +376,16 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
 
     if (IOExpander._allInstancesUsedGpios[gpioPin]) {
       // Already initialized GPIO
-      this._gpio = IOExpander._allInstancesUsedGpios[gpioPin];
-      this._gpio['ioExpanderUseCount']++;
+      this._gpio = IOExpander._allInstancesUsedGpios[gpioPin].gpio;
+      IOExpander._allInstancesUsedGpios[gpioPin].useCount++;
     } else {
       // Init the GPIO as input with falling edge,
       // because the chip will lower the interrupt line on changes
       this._gpio = new Gpio(gpioPin, 'in', 'falling');
-      this._gpio['ioExpanderUseCount'] = 1;
-      IOExpander._allInstancesUsedGpios[gpioPin] = this._gpio;
+      IOExpander._allInstancesUsedGpios[gpioPin] = {
+        gpio: this._gpio,
+        useCount: 1,
+      };
     }
 
     // Enable chip interrupts for input pins.
@@ -440,44 +427,17 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
 
     // Release the used GPIO
     // Decrease the use count of the GPIO and unexport it if not used anymore
-    this._gpio['ioExpanderUseCount']--;
-    if (this._gpio['ioExpanderUseCount'] === 0) {
-      if (this._gpioPin !== null) {
+    if (IOExpander._allInstancesUsedGpios[this._gpioPin]) {
+      IOExpander._allInstancesUsedGpios[this._gpioPin].useCount--;
+      if (IOExpander._allInstancesUsedGpios[this._gpioPin].useCount === 0) {
         // Delete the registered gpio from our allInstancesUsedGpios object as reference count is 0 and gpio is being unexported
         delete IOExpander._allInstancesUsedGpios[this._gpioPin];
+        this._gpio.unexport();
       }
-      this._gpio.unexport();
     }
     this._gpioPin = this._gpio = null;
   }
 
-  /**
-   * Disable the interrupt detection.
-   * This will unexport the interrupt GPIO, if it is not used by an other instance of this class.
-   */
-  /*
-  public disableInterrupt (): void {
-    // release the used GPIO
-    if (this._gpio !== null) {
-      // Disable all chip interrupts.
-      this._writeInterruptControlSync(0x00);
-      // remove the interrupt handling
-      this._gpio.unwatch(this._handleInterrupt);
-
-      // decrease the use count of the GPIO and unexport it if not used anymore
-      this._gpio['ioExpanderUseCount']--;
-      if (this._gpio['ioExpanderUseCount'] === 0) {
-        if (this._gpioPin !== null) {
-          // delete the registered gpio from our allInstancesUsedGpios object as reference count is 0 and gpio is being unexported
-          delete IOExpander._allInstancesUsedGpios[this._gpioPin];
-        }
-        this._gpio.unexport();
-      }
-      this._gpioPin = null;
-      this._gpio = null;
-    }
-  }
-  */
   /**
    * Helper function to set/clear one bit in a bitmask.
    * @param  {number}    current The current bitmask.

@@ -229,7 +229,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is read from the chip, or rejected in case of an error.
    */
   protected _readChip (byteCount: 1 | 2, msbFirst?: boolean) : Promise<number> {
-    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
+    return this._queue.enqueue(() => new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
       this._i2cBus.i2cRead(this._address, byteCount, Buffer.alloc(byteCount), (err, bytesRead, buffer) => {
         if (err || bytesRead !== byteCount) {
           reject(err);
@@ -243,7 +243,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
           }
         }
       });
-    });
+    }));
   }
 
   /**
@@ -254,7 +254,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is read from the chip, or rejected in case of an error.
    */
   protected _readChipRegister (register: number, byteCount: 1 | 2, msbFirst?: boolean) : Promise<number> {
-    return new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
+    return this._queue.enqueue(() => new Promise((resolve: (chipState: number) => void, reject: (err: Error) => void) => {
       this._i2cBus.readI2cBlock(this._address, register & 0xFF, byteCount, Buffer.alloc(byteCount), (err, bytesRead, buffer) => {
         if (err || bytesRead !== byteCount) {
           reject(err);
@@ -268,7 +268,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
           }
         }
       });
-    });
+    }));
   }
 
   /**
@@ -280,7 +280,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is written to the chip, or rejected in case of an error.
    */
   protected _writeChipRegister (register: number, byteCount: 1 | 2, value: number, msbFirst?: boolean) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+    return this._queue.enqueue(() => new Promise((resolve: () => void, reject: (err: Error) => void) => {
       let arr: number[];
       if (byteCount === 2) {
         arr = !!msbFirst ? [(value >> 8) & 0xFF, value & 0xFF] : [value & 0xFF, (value >> 8) & 0xFF];
@@ -294,7 +294,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
           resolve();
         }
       });
-    });
+    }));
   }
 
   /**
@@ -305,7 +305,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise} Promise which gets resolved with the 8 or 16 bit value is written to the chip, or rejected in case of an error.
    */
   protected _writeChip (byteCount: 1 | 2, value: number, msbFirst?: boolean) : Promise<void> {
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+    return this._queue.enqueue(() => new Promise<void>((resolve: () => void, reject: (err: Error) => void) => {
       let arr: number[];
       if (byteCount === 2) {
         arr = !!msbFirst ? [(value >> 8) & 0xFF, value & 0xFF] : [value & 0xFF, (value >> 8) & 0xFF];
@@ -319,7 +319,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
           resolve();
         }
       });
-    });
+    }));
   }
 
 

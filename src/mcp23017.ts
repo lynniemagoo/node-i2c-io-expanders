@@ -1,7 +1,8 @@
 /*
  * Node.js MCP23017
  *
- * Copyright (c) 2023 Lyndel McGee <lynniemagoo@yahoo.com>
+ * Copyright (c) 2023-2024 Lyndel McGee <lynniemagoo@yahoo.com>
+ *               2023-2024 Peter Müller <peter@crycode.de> (https://crycode.de)
  *
  * Node.js module for controlling each pin of a MCP23017 I2C port expander IC.
  */
@@ -159,47 +160,6 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
     await this._writeChipRegister(MCP23017_REGISTERS.OLATA, 2, this._currentState);
   }
-
-  /*
-  _initializeChipSync (initialState: number, inputPinBitmask: number) : void {
-
-    // On startup, Default chip config to use Bank 0 with Interrupt Mirroring and Open-Drain (Active Low) interrupts
-    const ioconFlags =
-      MCP23017_IOCON_FLAGS.DEFAULT |
-      MCP23017_IOCON_FLAGS.INT_MIRROR_ON |
-      MCP23017_IOCON_FLAGS.INT_OPEN_DRAIN_ENABLED,
-      buffAllOn: Buffer = Buffer.from([0xFF, 0xFF]),
-      buffAllOff: Buffer = Buffer.from([0x00, 0x00]);
-
-    this._i2cBus.writeByteSync(this._address, MCP23017_REGISTERS.IOCONA, ioconFlags);
-
-    // Disable all interrupts.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPINTENA, 2, buffAllOff);
-
-    // Set pins marked as input.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.IODIRA, 2, Buffer.from([inputPinBitmask & 0xFF, (inputPinBitmask >> 8) & 0xFF]));
-
-    // Force all pins to Pull-Up.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPPUA, 2, buffAllOn);
-
-    // Force no Polarity Invert as we will manage this in software with the _inverted bitField.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.IPOLA, 2, buffAllOff);
-
-    // Set interrupt change default values to 0.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.DEFVALA, 2, buffAllOff);
-
-    // Force interrupts to fire on state change - don't compare to DEFVAL.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.INTCONA, 2, buffAllOff);
-
-    // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.OLATA, 2, Buffer.from([initialState & 0xFF, (initialState >> 8) & 0xFF]));
-  }
-
-
-  _writeInterruptControlSync (interruptBitmask: number) : void {
-    this._i2cBus.writeI2cBlockSync(this._address, MCP23017_REGISTERS.GPINTENA, 2, Buffer.from([interruptBitmask & 0xFF, (interruptBitmask >> 8) & 0xFF]));
-  }
-  */
 
   protected _readState () : Promise<number> {
     return this._readChipRegister(MCP23017_REGISTERS.GPIOA, 2);

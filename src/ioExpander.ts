@@ -1,3 +1,12 @@
+/*
+ * Node.js I2C io expanders
+ *
+ * Copyright (c) 2017-2024 Peter Müller <peter@crycode.de> (https://crycode.de)
+ *               2022-2024 Lyndel McGee <lynniemagoo@yahoo.com>
+ *
+ * Node.js module for controlling each pin of a PCF8574/PCF8574A I2C port expander IC.
+ */
+
 import { EventEmitter } from 'events';
 import { I2CBus } from 'i2c-bus';
 import { Gpio } from 'onoff';

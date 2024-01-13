@@ -1,7 +1,8 @@
 /*
  * Node.js CAT9555
  *
- * Copyright (c) 2023 Lyndel McGee <lynniemagoo@yahoo.com>
+ * Copyright (c) 2023-2024 Lyndel McGee <lynniemagoo@yahoo.com>
+ *               2023-2024 Peter Müller <peter@crycode.de> (https://crycode.de)
  *
  * Node.js module for controlling each pin of a CAT9555 I2C port expander IC.
  */

@@ -1,3 +1,9 @@
+/*
+ * Promise Queue
+ *
+ * Copyright(c) 2021-2024 Peter Müller <peter@crycode.de> (https://crycode.de)
+ */
+
 /**
  * Interface to describe a queued promise in a `PromiseQueue`.
  */
@@ -9,8 +15,6 @@ interface QueuedPromise<T = any> {
 
 /**
  * A simple Promise Queue to allow the execution of some tasks in the correct order.
- *
- * (c) Peter Müller <peter@crycode.de>
  */
 export class PromiseQueue {
 

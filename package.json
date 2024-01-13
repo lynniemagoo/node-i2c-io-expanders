@@ -24,6 +24,9 @@
     "node": ">=18.0.0"
   },
   "author": "Lyndel McGee <lynniemagoo@yahoo.com>",
+  "contributors": [
+    "Peter Müller <peter@crycode.de> (https://crycode.de)"
+  ],
   "license": "GPL-2.0",
   "repository": {
     "type": "git",

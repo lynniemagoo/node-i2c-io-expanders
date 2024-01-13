@@ -1,8 +1,8 @@
 /*
  * Node.js PCF8575
  *
- * Copyright (c) 2017-2023 Peter Müller <peter@crycode.de> (https://crycode.de)
- *               2022 - PCF8575 support inspired by Lyndel McGee <lynniemagoo@yahoo.com>
+ * Copyright (c) 2017-2024 Peter Müller <peter@crycode.de> (https://crycode.de)
+ *               2022-2024 Lyndel McGee <lynniemagoo@yahoo.com>
  *
  * Node.js module for controlling each pin of a PCF8575 I2C port expander IC.
  */
@@ -57,12 +57,6 @@ export class PCF8575 extends IOExpander<IOExpander.PinNumber16> {
   protected _initializeChip () : Promise<void> {
     return this._writeChip(2, this._currentState);
   }
-
-  /*
-  _initializeChipSync (initialState: number, _inputPinBitmask: number) : void {
-    this._i2cBus.i2cWriteSync(this._address, 2, Buffer.from([initialState & 0xFF, (initialState >>> 8) & 0xFF]));
-  }
-  */
 
   protected _readState () : Promise<number> {
     return this._readChip(2);

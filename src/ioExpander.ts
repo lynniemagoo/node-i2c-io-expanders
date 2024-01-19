@@ -727,6 +727,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
 }
 
 export namespace IOExpander {
+
   /**
    * Internal enum to specify state to apply during update
    */

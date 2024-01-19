@@ -67,21 +67,6 @@ export namespace IOExpander {
      */
     useCount: number;
   }
-
-  /**
-   * Internal structure to track pins to set and values.
-   */
-  export interface PinUpdate {
-    /**
-     * The pin number.
-     */
-    pin: number;
-
-    /**
-     * Value to set for the pin.
-     */
-    value: boolean;
-  }
 }
 
 /**
@@ -163,8 +148,8 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /** PromiseQueue to handle requested I2C actions in order. */
   private _queue: PromiseQueue = new PromiseQueue();
 
-  /** Number of polls currently in the queue */
-  private _queuePollCount: number = 0;
+  /** Number of polls currently active */
+  private _pollCount: number = 0;
 
   /** Pin number of GPIO to detect interrupts, or null by default. */
   private _gpioPin: number | null = null;
@@ -208,7 +193,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @param  {boolean|number} initialState The initial state of the pins of this IC. You can set a bitmask to define each pin separately, or use true/false for all pins at once.
    * @return {Promise} Promise which gets resolved when done, or rejected in case of an error.
    */
-  // LRM  - made async so that when we throw error a promise will be rejected?
   // LRM  - I question the usefulness of initialState as a number.  This is because the number supplied must
   //        also include a mask for inversion of pins which is not known until inputPin or outputPin is called.
   //        My thoughts would be to eliminate this parameter and always default initialState to all 1's which is the state that
@@ -429,11 +413,10 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * Internal function to handle a GPIO interrupt.
    */
   private _handleInterrupt (): void {
-    console.log('Interrupt!');
-    // Enqueue a poll of current state.
+    // Request a poll of current state.
     // When poll is serviced, notify listeners that a 'processed' interrupt occurred.
     // When not queued or poll fails, notify listeners of an 'unprocessed' interrupt.
-    this._enqueuePoll()
+    this._requestPoll()
       .then(() => this.emit('interrupt', true))
       .catch(() => this.emit('interrupt', false));
   }
@@ -487,67 +470,19 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
 
   /**
    * Write the current state to the IC.
-   * @param  {number}  newState (optional) The new state which will be set. If omitted the current state will be used.
-   * @return {Promise}          Promise which gets resolved when the state is written to the IC, or rejected in case of an error.
-   */
-  // LRM - DEAD Code - Remains for now to document why _setNewState signature changed and the initial changes
-  //                   put in below to only mutate output pins in _setNewState which was required to overcome issues in _poll because within
-  //                   the loop we were originally comparing ((this._currentState >> pin) % 2) to ((readState >> pin) % 2).
-  private _setNewStateOrig (newState?: number): Promise<void> {
-    // LRM - Cannot use enqueue here as an outer enqueue is likely from setPin or setAllPins.
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
-      if (typeof (newState) === 'number') {
-        // LRM - TBD if needed but believe that it is for full bulletproofing.
-        //
-        // LRM - This code could be executed during interrupt handling if someone calls setPin without awaiting the results and in this case we want to
-        // only overwrite bits associated with pins marked as output, otherwise, we can overwrite a value for an input pin that has not yet been set
-        // in the poll emit loop (see lines 561-574).
-        //
-        // Reproduction scenario.
-        // 1. Interrupt occurs and multiple pin changes are detected
-        // 2. Application can then call setPin() which is asychronous but does not await results.
-        // 3. Application will make multiple calls to setPin() based on #1.
-        // 4. Before all calls to setPin complete, another interrupt occurs.
-        // 5. Interrupt _poll reads the chip and gets new input pin states.
-        // 6. Any setPin() call that resolves following interrupt trigger will corrupt this._currentState
-        //    because the value that was captured from _setPinInternal will not have the updated input pin states.
-        //
-        // LRM - this line is a cause of the race (manifests itself as missed pin changes on an interrupt).
-        // this._currentState = newState;
-        //
-        // The fix is to only update state bits for output pins.
-        // Here, input pin bit values are not modified and output pin bit values are ORed based on bits in newState.
-        this._currentState = (this._currentState & this._inputPinBitmask) | (newState & ~this._inputPinBitmask);
-        //console.log('_setNewState current:%s new:%s', this._currentState.toString(16).padStart(4, '0'), newState.toString(16).padStart(4, '0'));
-      }
-
-      // respect inverted with bitmask using XOR
-      let newIcState = this._currentState ^ this._inverted;
-
-      // set all input pins to high
-      newIcState = newIcState | this._inputPinBitmask;
-
-      // write output to chip and resolve/reject when done.
-      this._writeState(newIcState)
-        .then(() => resolve())
-        .catch((err: Error) => reject(err));
-    });
-  }
-
-  /**
-   * Write the current state to the IC.
-   * @param  {array}  pinUpdates (optional) Array containing PinUpdate objects to use to mutate bits in current state.
+   * @param  {array}  pinUpdates (optional) Array containing PinUpdate objects to use to mutate pin bits in current state.
    * @return {Promise}          Promise which gets resolved when the state is written to the IC, or rejected in case of an error.
    */
   private _setNewState (pinUpdates?: IOExpander.PinUpdate[]): Promise<void> {
-    // LRM - as we are mutating _currentState, must wrap this mutation
-    // LRM - Cannot use enqueue here as an outer enqueue is likely from setPin or setAllPins.
-    return new Promise((resolve: () => void, reject: (err: Error) => void) => {
+    // To avoid races, ensure access and mutation of this._currentState are ordered via a queue.
+    return this._queue.enqueue(async () => {
       // mutate only the pin bits that were requested.
       if (Array.isArray(pinUpdates)) {
         for (let i=0; i< pinUpdates.length; i++) {
           const pinUpdate = pinUpdates[i];
-          this._currentState = this._setStatePin(this._currentState, pinUpdate.pin as PinNumber, pinUpdate.value as boolean);
+          // Toggle, Set, or Reset pin based on state requested.
+          const state: boolean = (pinUpdate.pinState === IOExpander.PinState.Toggle) ? !(((this._currentState >> pinUpdate.pin) % 2) != 0) : (pinUpdate.pinState === IOExpander.PinState.On);
+          this._currentState = this._setStatePin(this._currentState, pinUpdate.pin as PinNumber, state);
         }
       }
 
@@ -557,19 +492,16 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       // set all input pins to high
       newIcState = newIcState | this._inputPinBitmask;
 
-      // write output to chip and resolve/reject when done.
-      this._writeState(newIcState)
-        .then(() => resolve())
-        .catch((err: Error) => reject(err));
+      await this._writeState(newIcState);
     });
   }
 
   /**
-   * Returns if one or multiple polls are currently queued for execution.
+   * Returns if one or multiple polls are currently active.
    * @returns `true` if we are currently polling.
    */
   public isPolling (): boolean {
-    return !this._queue.isEmpty();
+    return this._pollCount != 0;
   }
 
   /**
@@ -581,93 +513,88 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise<number>} - value representing pin states following any I2C read/write and update of the internal state.
    */
   private async _poll (noEmit?: PinNumber | null): Promise<number> {
-    if (this._currentlyPolling) {
-      // LRM - original code was doing reject with a string value.  To be consistent with other functions, throw an error.
-      // Promise.reject('An other poll is in progress');
-      throw new Error('An other poll is in progress');
-    }
+    // To avoid races, ensure access and mutation of this._currentState are ordered via a queue.
+    return this._queue.enqueue(async () => {
+      if (this._currentlyPolling) {
+        throw new Error('An other poll is in progress');
+      }
 
-    this._currentlyPolling = true;
+      this._currentlyPolling = true;
 
-    try {
-      let readState: number = await this._readState();
+      try {
+        let readState: number = await this._readState();
 
-      // Process data read from chip and notify input pins of changes.
-      this._currentlyPolling = false;
-      // respect inverted with bitmask using XOR
-      readState = readState ^ this._inverted;
+        // Process data read from chip and notify input pins of changes.
+        this._currentlyPolling = false;
+        // respect inverted with bitmask using XOR
+        readState = readState ^ this._inverted;
 
-      // LRM - changes below fixes bug where an 'input' listener could mutate this._currentState
-      // via setPin/_setPinInternal and we could miss an input pin change.
+        // Calculate exactly which pins have changed and then remove pin bits for pins that are not inputs.
+        // this._currentState XOR readState gives us 1 bits for pins that changed.
+        // then we AND this with the inputPinBitMask to reflect only pins that are inputs at chip-level..
+        const inputPinsThatChanged: number = (this._currentState ^ readState) & this._inputPinBitmask;
 
-      // Calculate exactly which pins have changed and then remove pin bits for pins that are not inputs.
-      // this._currentState XOR readState gives us 1 bits for pins that changed.
-      // then we AND this with the inputPinBitMask to reflect only pins that are inputs at chip-level..
-      const pinsThatChanged: number = (this._currentState ^ readState) & this._inputPinBitmask;
-      // There are cases where multiple interrupts can be fired and no input changes have occurred
-      // Don't loop unless we detect them.
-      if (pinsThatChanged !== 0) {
-        for (let pin = 0; pin < this._pins; pin++) {
-          // pinsThatChanged indeed contains input pins but maybe some of these have not been assigned for use via inputPin().
-          // Therefore, we must also check this._directions[pin].
-          if ((this._directions[pin] === IOExpander.DIR_IN) && ((pinsThatChanged >> pin) % 2)) {
-            const value: boolean = ((readState >> pin) % 2 !== 0);
-            // LRM - updating this._currentState on each loop iteration is risky without the changes made to _setNewState above.
-            this._currentState = this._setStatePin(this._currentState, pin as PinNumber, value);
-            if (noEmit !== pin) {
-              this.emit('input', <IOExpander.InputData<PinNumber>>{ pin: pin, value: value });
+        // If no input pins have changed
+        // Don't loop unless we detect them.
+        if (inputPinsThatChanged !== 0) {
+          for (let pin = 0; pin < this._pins; pin++) {
+            // inputPinsThatChanged indeed contains input pins but maybe some of these have not been assigned for use via inputPin().
+            // Therefore, we must also check this._directions[pin] because we don't want to fire events for pins that application
+            // does not want to monitor.
+            if ((this._directions[pin] === IOExpander.DIR_IN) && ((inputPinsThatChanged >> pin) % 2)) {
+              const value: boolean = ((readState >> pin) % 2 !== 0);
+              this._currentState = this._setStatePin(this._currentState, pin as PinNumber, value);
+              if (noEmit !== pin) {
+                this.emit('input', <IOExpander.InputData<PinNumber>>{ pin: pin, value: value });
+              }
             }
           }
         }
+        return this._currentState;
+      } catch (err) {
+        this._currentlyPolling = false;
+        throw err;
       }
-      return this._currentState;
-    } catch (err) {
-      this._currentlyPolling = false;
-      throw err;
-    }
+    });
   }
 
   /**
-   * Enqueue a poll to the queue of I2C operations.
-   *
-   * There can be up to 3 + number of pins on IC polls queued.
-   * When trying to enqueue a poll if already the max limit of polls are queued, the Promise will be rejected.
+   * Request a poll to read pin values from the IC.
+   * Normally, there can be up to 3 + number of pins on IC polls active at one time.
+   * When trying to request a poll if already the max limit of polls active, the Promise will be rejected.
    * @param {PinNumber | null} noEmit (optional) Pin number of a pin which should not trigger an event. (used for getting the current state while defining a pin as input)
-   * @param {boolean} ignoreMaxPollCount Ignore the maximum limit of polls in queue and enqueue anyways.
+   * @param {boolean} ignoreMaxPollCount Ignore the maximum limit of polls that can be active at same time.
    * @returns {Promise<number>} Promise resolving to the pin states after successfull poll.
    */
-  private async _enqueuePoll (noEmit?: PinNumber | null, ignoreMaxPollCount?: boolean): Promise<number> {
-    if (!ignoreMaxPollCount && this._queuePollCount >= (3 + this._pins)) {
-      throw new Error('To many polls in queue');
+  private async _requestPoll (noEmit?: PinNumber | null, ignoreMaxPollCount?: boolean): Promise<number> {
+    if (!ignoreMaxPollCount && this._pollCount >= (3 + this._pins)) {
+      throw new Error('Too many polls currently active');
     }
 
-    this._queuePollCount++;
-    return this._queue.enqueue(async () => {
-      let v;
-      // LRM - must wrap with try/catch/finally to ensure counter is decremented if the _poll fails.
-      try {
-        v = await this._poll(noEmit);
-      } catch (err) {
-        throw err;
-      }
-      finally {
-        this._queuePollCount--;
-      }
-      return v;
-    });
+    this._pollCount++;
+    let v: number;
+    try {
+      v = await this._poll(noEmit);
+    } catch (err) {
+      throw err;
+    }
+    finally {
+      this._pollCount--;
+    }
+    return v;
   }
 
   /**
    * Manually poll changed inputs from the IC.
    * If a change on an input is detected, an "input" Event will be emitted with a data object containing the "pin" and the new "value".
-   * This have to be called frequently enough if you don't use a GPIO for interrupt detection.
+   * This function has to be called frequently enough if you don't use a GPIO for interrupt detection.
    * If you poll again before the last poll was completed, the new poll will be queued up the be executed after the current poll.
-   * If you poll again while also a poll is queued, this will be rejected.
-   * @param {boolean} ignoreMaxPollCount Ignore the maximum of 3 polls in queue and enqueue anyways.
+   * Normally, there can be up to 3 + number of pins on IC polls active at one time.
+   * @param {boolean} ignoreMaxPollCount Ignore the maximum limit of polls in queue and request a poll anyways.
    * @return {Promise<number>} - value representing pin states following any I2C read/write and update of the internal state.
    */
   public doPoll (ignoreMaxPollCount?: boolean): Promise<number> {
-    return this._enqueuePoll(null, ignoreMaxPollCount);
+    return this._requestPoll(null, ignoreMaxPollCount);
   }
 
   /**
@@ -695,7 +622,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     // ... and call _setNewState() to activate the high level on the input pin ...
     await this._setNewState();
     // ... and then _poll all current inputs with noEmit on this pin to suppress the event
-    return this._enqueuePoll(pin, true);
+    return this._requestPoll(pin, true);
   }
 
   /**
@@ -729,8 +656,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       // ... and then write interrupt control flags if required
       await this._writeInterruptControl(this._inputPinBitmask);
       // ... and then set the internal pin state.
-      // LRM - as we need to wrap access/mutate of currentState, call setPin instead.
-      await this.setPin(pin, initialValue)
+      await this._setPinInternal(pin, initialValue ? IOExpander.PinState.On : IOExpander.PinState.Off);
     }
   }
 
@@ -750,15 +676,17 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       throw new Error('Pin is not defined as output');
     }
 
-    return this._queue.enqueue(async () => {
-      if (typeof (value) == 'undefined') {
-        // set value dependend on current state to toggle
-        value = !((this._currentState >> (pin as number)) % 2 !== 0)
-      }
+    return this._setPinInternal(pin, (typeof (value) == 'undefined') ? IOExpander.PinState.Toggle : (value ? IOExpander.PinState.On : IOExpander.PinState.Off));
+  }
 
-      // request single pin update with new value
-      return await this._setNewState([{pin, value}]);
-    });
+  /**
+   * Internal function to set the state of a pin.
+   * @param  {PinNumber} pin   The pin number. (0 to 7 for PCF8574/PCF8574A, 0 to 15 for PCF8575, CAT9555, and MCP23017)
+   * @param  {PinState}  state The state to set for the pin
+   * @return {Promise}
+   */
+  private _setPinInternal (pin: PinNumber, pinState: IOExpander.PinState): Promise<void> {
+    return this._setNewState([{pin, pinState}]);
   }
 
   /**
@@ -772,17 +700,15 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       return;
     }
 
-    return this._queue.enqueue(async () => {
-      const pinUpdates: IOExpander.PinUpdate[] = [];
-      const booleanValue = typeof (value) === 'boolean';
-      for (let pin = 0; pin < this._pins; pin++) {
-        if (this._directions[pin] == IOExpander.DIR_OUT) {
-          // push pin update with new value
-          pinUpdates.push({pin, value:(booleanValue ? value : ((value & (1 << pin)) !== 0))});
-        }
+    const pinUpdates: IOExpander.PinUpdate[] = [];
+    const booleanValue = typeof (value) === 'boolean';
+    for (let pin = 0; pin < this._pins; pin++) {
+      if (this._directions[pin] == IOExpander.DIR_OUT) {
+        // Push pin update with specified state
+        pinUpdates.push({pin, pinState:(booleanValue ? value : ((value & (1 << pin)) !== 0)) ? IOExpander.PinState.On : IOExpander.PinState.Off});
       }
-      await this._setNewState(pinUpdates);
-    });
+    }
+    return  this._setNewState(pinUpdates);
   }
 
   /**
@@ -797,5 +723,31 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       return false;
     }
     return ((this._currentState >> (pin as number)) % 2 !== 0)
+  }
+}
+
+export namespace IOExpander {
+  /**
+   * Internal enum to specify state to apply during update
+   */
+  export enum PinState {
+    Off,
+    On,
+    Toggle
+  }
+
+  /**
+   * Internal structure to track pins to set and state for pin.
+   */
+  export interface PinUpdate {
+    /**
+     * The pin number.
+     */
+    pin: number;
+
+    /**
+     * State to set for the pin. - Off, On, or Toggle
+     */
+    pinState: PinState;
   }
 }

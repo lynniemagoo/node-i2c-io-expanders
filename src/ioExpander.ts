@@ -378,8 +378,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   public async enableInterrupt (gpioPin: number): Promise<void> {
     if (this._gpio !== null) {
       // Must first call disable if previously enabled.
-      // throw new Error('GPIO interrupt already enabled.');
-      return Promise.reject(new Error('GPIO interrupt already enabled.'));
+      throw new Error('GPIO interrupt already enabled.');
     }
 
     if (IOExpander._allInstancesUsedGpios[gpioPin]) {
@@ -427,23 +426,25 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       return;
     }
 
-    // Disable all chip interrupts.
-    await this._writeInterruptControl(0x00);
+    try {
+      // Disable all chip interrupts.
+      await this._writeInterruptControl(0x00);
+    } finally {
+      // remove the interrupt handling
+      this._gpio.unwatch(this._handleInterrupt);
 
-    // remove the interrupt handling
-    this._gpio.unwatch(this._handleInterrupt);
-
-    // Release the used GPIO
-    // Decrease the use count of the GPIO and unexport it if not used anymore
-    if (IOExpander._allInstancesUsedGpios[this._gpioPin]) {
-      IOExpander._allInstancesUsedGpios[this._gpioPin].useCount--;
-      if (IOExpander._allInstancesUsedGpios[this._gpioPin].useCount === 0) {
-        // Delete the registered gpio from our allInstancesUsedGpios object as reference count is 0 and gpio is being unexported
-        delete IOExpander._allInstancesUsedGpios[this._gpioPin];
-        this._gpio.unexport();
+      // Release the used GPIO
+      // Decrease the use count of the GPIO and unexport it if not used anymore
+      if (IOExpander._allInstancesUsedGpios[this._gpioPin]) {
+        IOExpander._allInstancesUsedGpios[this._gpioPin].useCount--;
+        if (IOExpander._allInstancesUsedGpios[this._gpioPin].useCount === 0) {
+          // Delete the registered gpio from our allInstancesUsedGpios object as reference count is 0 and gpio is being unexported
+          delete IOExpander._allInstancesUsedGpios[this._gpioPin];
+          this._gpio.unexport();
+        }
       }
+      this._gpioPin = this._gpio = null;
     }
-    this._gpioPin = this._gpio = null;
   }
 
   /**
@@ -511,6 +512,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     // To avoid races, ensure access and mutation of this._currentState are ordered via a queue.
     return this._queue.enqueue(async () => {
       if (this._currentlyPolling) {
+        //console.error('An other poll is in progress');
         throw new Error('An other poll is in progress');
       }
 
@@ -563,6 +565,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    */
   private async _requestPoll (noEmit?: PinNumber | null, ignoreMaxPollCount?: boolean): Promise<number> {
     if (!ignoreMaxPollCount && this._pollCount >= (3 + this._pins)) {
+      //console.error('Too many polls currently active');
       throw new Error('Too many polls currently active');
     }
 

@@ -168,9 +168,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   constructor (i2cBus: I2CBus, address: number) {
     super();
 
-    // LRM - My style preference is to do a bind of a static class method
-    //       Here, we're updating an instance method with a bound version
-    //       from the prototype.
     // bind the _handleInterrupt method strictly to this instance
     this._handleInterrupt = this._handleInterrupt.bind(this);
 
@@ -184,8 +181,6 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
 
     // nothing inverted by default
     this._inverted = 0;
-
-    // full init is done in the `initialize()` method
   }
 
   /**
@@ -412,13 +407,19 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /**
    * Internal function to handle a GPIO interrupt.
    */
-  private _handleInterrupt (): void {
+  private async _handleInterrupt (): Promise<void> {
     // Request a poll of current state.
-    // When poll is serviced, notify listeners that a 'processed' interrupt occurred.
+    // After poll is serviced, notify listeners that a 'processed' interrupt occurred.
     // When not queued or poll fails, notify listeners of an 'unprocessed' interrupt.
-    this._requestPoll()
-      .then(() => this.emit('interrupt', true))
-      .catch(() => this.emit('interrupt', false));
+    let processed: boolean = false;
+    try {
+      await this._requestPoll();
+      processed = true;
+    } finally {
+      // Should we fail to poll the chip on an interrupt, a listener can detect this failure and schedule a poll for a future time
+      // to ensure that chip is read and interrupt will be cleared to allow new ones to occur.
+      this.emit('interrupt', processed);
+    }
   }
 
   /**

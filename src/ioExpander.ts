@@ -407,19 +407,13 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
   /**
    * Internal function to handle a GPIO interrupt.
    */
-  private async _handleInterrupt (): Promise<void> {
+  private _handleInterrupt (): void {
     // Request a poll of current state.
     // After poll is serviced, notify listeners that a 'processed' interrupt occurred.
     // When not queued or poll fails, notify listeners of an 'unprocessed' interrupt.
-    let processed: boolean = false;
-    try {
-      await this._requestPoll();
-      processed = true;
-    } finally {
-      // Should we fail to poll the chip on an interrupt, a listener can detect this failure and schedule a poll for a future time
-      // to ensure that chip is read and interrupt will be cleared to allow new ones to occur.
-      this.emit('interrupt', processed);
-    }
+    this._requestPoll()
+      .then(() => this.emit('interrupt', true))
+      .catch(() => this.emit('interrupt', false));
   }
 
   /**

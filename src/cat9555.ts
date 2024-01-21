@@ -72,13 +72,13 @@ export class CAT9555 extends IOExpander<IOExpander.PinNumber16> {
     super(i2cBus, address);
   }
 
-  protected async _initializeChip () : Promise<void> {
+  protected async _initializeChip (initialHardwareState: number) : Promise<void> {
     // On startup, Force no Polarity Invert as we will manage this in software with the _inverted bitField.
     await this._writeChipRegister(CAT9555_REGISTERS.POL_INV_0, 2, 0x00);
     // Set pins marked as input.
     await this._writeChipRegister(CAT9555_REGISTERS.CON_PORT_0, 2, this._inputPinBitmask);
     // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
-    await this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, this._currentState);
+    await this._writeChipRegister(CAT9555_REGISTERS.OUTPUT_PORT_0, 2, initialHardwareState);
   }
 
   /*

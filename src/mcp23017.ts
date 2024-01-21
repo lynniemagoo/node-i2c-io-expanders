@@ -139,7 +139,7 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     super(i2cBus, address);
   }
 
-  protected async _initializeChip () : Promise<void> {
+  protected async _initializeChip (initialHardwareState: number) : Promise<void> {
     // On startup, Default chip config to use Bank 0 with Interrupt Mirroring and Open-Drain (Active Low) interrupts
     const ioconFlags =
       MCP23017_IOCON_FLAGS.DEFAULT |
@@ -157,8 +157,8 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     await this._writeChipRegister(MCP23017_REGISTERS.IPOLA, 2, 0x00);
     // Set interrupt change default values to 0.
     await this._writeChipRegister(MCP23017_REGISTERS.INTCONA, 2, 0x00);
-    // Write the initial state which should have no effect as all ports set as input but ensures output register is set appropriately.
-    await this._writeChipRegister(MCP23017_REGISTERS.OLATA, 2, this._currentState);
+    // Write the initial state which should have no effect as all ports set as input (IODIRA) but ensures output register is set appropriately.
+    await this._writeChipRegister(MCP23017_REGISTERS.OLATA, 2, initialHardwareState);
   }
 
   protected _readState () : Promise<number> {

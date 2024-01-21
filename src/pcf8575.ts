@@ -54,8 +54,8 @@ export class PCF8575 extends IOExpander<IOExpander.PinNumber16> {
     super(i2cBus, address);
   }
 
-  protected _initializeChip () : Promise<void> {
-    return this._writeChip(2, this._currentState);
+  protected _initializeChip (initialHardwareState: number) : Promise<void> {
+    return this._writeChip(2, initialHardwareState);
   }
 
   protected _readState () : Promise<number> {

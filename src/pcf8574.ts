@@ -54,7 +54,7 @@ export class PCF8574 extends IOExpander<IOExpander.PinNumber8> {
   }
 
   protected _initializeChip (initialHardwareState: number) : Promise<void> {
-    return this._writeChip(2, initialHardwareState);
+    return this._writeChip(1, initialHardwareState);
   }
 
   protected _readState () : Promise<number> {

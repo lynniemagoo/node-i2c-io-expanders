@@ -577,13 +577,13 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
     this._queuePollCount++;
     return this._queue.enqueue(async () => {
       let v;
-      // Wrap with try/finally to ensure counter is decremented if the read fails.
+      // Wrap with try/catch to ensure counter is decremented if the read fails.
       try {
         v = await this._poll(noEmit);
-      } catch (err) {
-        throw err;
-      } finally {
         this._queuePollCount--;
+      } catch (err) {
+        this._queuePollCount--;
+        throw err;
       }
       return v;
     });

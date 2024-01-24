@@ -1,86 +1,93 @@
 /*
- * Node.js MCP23017.js
+ * Node.js MCP23017
  *
- * Copyright (c) 2023 Lyndel McGee <lynniemagoo@yahoo.com>
+ * Copyright (c) 2017-2023 Peter Müller <peter@crycode.de> (https://crycode.de)
+ *               2024 - MCP23017 support added by Lyndel McGee <lynniemagoo@yahoo.com>
  *
  * Node.js module for controlling each pin of a MCP23017 I2C port expander IC.
  *
  * This example is showing you how to setup and use inputs and outputs.
  */
 
-// Import the MCP23017 class from the MCP23017 module
-//import { MCP23017 } from 'MCP23017';
+// Import the MCP23017 class
+//import { MCP23017 } from '@lynniemagoo/i2c-io-expanders';
 import { MCP23017 } from '../../';
 
 // Import the i2c-bus module and open the bus
 import {I2CBus, openSync as I2CBusOpenSync} from 'i2c-bus';
 const i2cBus: I2CBus = I2CBusOpenSync(1);
 
-// Define the address of the MCP23017
+// Define the address of the MCP23017 (0x20)
 const addr: number = 0x27;
 
-// Init a new MCP23017 with all pins high by default
-// Instead of 'true' you can also use a 16-bit binary notation to define each
-// pin speratly, e.g. 0b0000000000101010
-const mcp: MCP23017 = new MCP23017(i2cBus, addr, true);
+const pcf: MCP23017 = new MCP23017(i2cBus, addr);
 
-// Enable interrupt detection on BCM pin 18 (which is GPIO.1)
-mcp.enableInterrupt(18);
-
-// Alternatively you can use for example an interval for manually poll every 250ms
-// setInterval(mcp.doPoll.bind(mcp), 250);
 
 // Note the missing ; at the end of the following lines.
 // This is a Promise chain!
 
-// Define pin 7 as inverted output with initally false
-mcp.outputPin(7, true, false)
+// Init a new MCP23017 with all pins high by default
+// Instead of 'true' you can also use a 8-bit binary notation to define each
+// pin separately, e.g. 0b0000000000101010
+pcf.initialize(true)
 
-// Then define pin 6 as inverted output with initally false
+  // Then enable interrupt detection on BCM pin 18 (which is GPIO.0)
   .then(() => {
-    return mcp.outputPin(6, true, false);
+    // Alternatively you can use for example an interval for manually poll every 250ms
+    // setInterval(pcf.doPoll.bind(pcf), 250);
+    return pcf.enableInterrupt(18);
   })
 
-  // Then define pin 0 as non inverted input
+  // Then define pin 4 as inverted output with initally false
   .then(() => {
-    return mcp.inputPin(0, true);
+    return pcf.outputPin(4, true, false);
   })
 
-  // Delay 1 second
+  // Then define pin 5 as inverted output with initally true
+  .then(() => {
+    return pcf.outputPin(5, true, true);
+  })
+
+  // Then define pin 3 as non inverted input
+  .then(() => {
+    return pcf.inputPin(3, false);
+  })
+
+  // Then delay 1 second
   .then(() => new Promise((resolve) => {
     setTimeout(resolve, 1000);
   }))
 
-  // Then turn the pin on
+  // Then turn pin 4 on
   .then(() => {
-    console.log('turn pin 7 on');
-    return mcp.setPin(7, true);
+    console.log('turn pin 4 on');
+    return pcf.setPin(4, true);
   })
 
-  // Delay 1 second
+  // Then delay 1 second
   .then(() => new Promise((resolve) => {
     setTimeout(resolve, 1000);
   }))
 
-  // Then turn the pin off
+  // Then turn the pin 4 off
   .then(() => {
-    console.log('turn pin 7 off');
-    return mcp.setPin(7, false);
+    console.log('turn pin 4 off');
+    return pcf.setPin(4, false);
   });
 
 // Add an event listener on the 'input' event
-mcp.on('input', (data: MCP23017.InputData) => {
+pcf.on('input', (data: MCP23017.InputData) => {
   console.log('input', data);
 
-  // Check if a button attached to pin 0 is pressed (signal goes low)
-  if(data.pin === 0 && data.value === false){
-    // Toggle pin 6
-    mcp.setPin(6);
+  // Check if a button attached to pin 7 is pressed (signal goes low)
+  if(data.pin === 3 && data.value === false){
+    // Toggle pin 5
+    pcf.setPin(5);
   }
 });
 
 // Handler for clean up on SIGINT (ctrl+c)
-process.on('SIGINT', () => {
-  mcp.removeAllListeners();
-  mcp.disableInterrupt();
+process.on('SIGINT', async () => {
+  await pcf.close();
+  i2cBus.closeSync();
 });

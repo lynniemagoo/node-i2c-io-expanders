@@ -1,15 +1,16 @@
 /*
- * Node.js CAT9555.js
+ * Node.js CAT9555
  *
- * Copyright (c) 2023 Lyndel McGee <lynniemagoo@yahoo.com>
+ * Copyright (c) 2017-2023 Peter Müller <peter@crycode.de> (https://crycode.de)
+ *               2022 - CAT9555 support added by Lyndel McGee <lynniemagoo@yahoo.com>
  *
  * Node.js module for controlling each pin of a CAT9555 I2C port expander IC.
  *
  * This example is showing you how to setup and use inputs and outputs.
  */
 
-// Import the CAT9555 class from the CAT9555 module
-//import { CAT9555 } from 'CAT9555';
+// Import the CAT9555 class
+//import { CAT9555 } from '@lynniemagoo/i2c-io-expanders';
 import { CAT9555 } from '../../';
 
 // Import the i2c-bus module and open the bus
@@ -19,95 +20,74 @@ const i2cBus: I2CBus = I2CBusOpenSync(1);
 // Define the address of the CAT9555 (0x20)
 const addr: number = 0x27;
 
-// Init a new CAT9555 with all pins high by default
-// Instead of 'true' you can also use a 16-bit binary notation to define each
-// pin speratly, e.g. 0b0000000000101010
-const cat: CAT9555 = new CAT9555(i2cBus, addr, true);
+const pcf: CAT9555 = new CAT9555(i2cBus, addr);
 
-// Enable interrupt detection on BCM pin 18 (which is GPIO.0)
-cat.enableInterrupt(18);
-
-// Alternatively you can use for example an interval for manually poll every 250ms
-// setInterval(cat.doPoll.bind(cat), 250);
 
 // Note the missing ; at the end of the following lines.
 // This is a Promise chain!
 
-cat.outputPin(7, true, false)
+// Init a new CAT9555 with all pins high by default
+// Instead of 'true' you can also use a 8-bit binary notation to define each
+// pin separately, e.g. 0b0000000000101010
+pcf.initialize(true)
+
+  // Then enable interrupt detection on BCM pin 18 (which is GPIO.0)
   .then(() => {
-    return cat.outputPin(6, true, false);
+    // Alternatively you can use for example an interval for manually poll every 250ms
+    // setInterval(pcf.doPoll.bind(pcf), 250);
+    return pcf.enableInterrupt(18);
   })
+
+  // Then define pin 0 as inverted output with initally false
   .then(() => {
-    return cat.outputPin(5, true, false);
+    return pcf.outputPin(0, true, false);
   })
+
+  // Then define pin 1 as inverted output with initally true
   .then(() => {
-    return cat.outputPin(4, true, false);
+    return pcf.outputPin(1, true, true);
   })
-  // Then define pins 0-3 as inverted input
+
+  // Then define pin 7 as non inverted input
   .then(() => {
-    return cat.inputPin(0, true);
+    return pcf.inputPin(7, false);
   })
-  .then(() => {
-    return cat.inputPin(1, true);
-  })
-  .then(() => {
-    return cat.inputPin(2, true);
-  })
-  .then(() => {
-    return cat.inputPin(3, true);
-  })
-  .then(() => {
-    return cat.setPin(5);
-  })
-  // Delay 1 second
-  .then(() => new Promise((resolve) => {
-    setTimeout(resolve, 1000);
-  }))
-  .then(() => {
-    return cat.setPin(5);
-  })
-  // Delay 1 second
-  .then(() => new Promise((resolve) => {
-    setTimeout(resolve, 1000);
-  }))
-  .then(() => {
-    return cat.setPin(6);
-  })
-  // Delay 1 second
-  .then(() => new Promise((resolve) => {
-    setTimeout(resolve, 1000);
-  }))
-  // Then turn the pin on
-  .then(() => {
-    return cat.setPin(6);
-  })
-  // Delay 1 second
+
+  // Then delay 1 second
   .then(() => new Promise((resolve) => {
     setTimeout(resolve, 1000);
   }))
 
+  // Then turn pin 0 on
+  .then(() => {
+    console.log('turn pin 0 on');
+    return pcf.setPin(0, true);
+  })
+
+  // Then delay 1 second
+  .then(() => new Promise((resolve) => {
+    setTimeout(resolve, 1000);
+  }))
+
+  // Then turn the pin 0 off
+  .then(() => {
+    console.log('turn pin 0 off');
+    return pcf.setPin(0, false);
+  });
+
 // Add an event listener on the 'input' event
-cat.on('input', (data: CAT9555.InputData) => {
+pcf.on('input', (data: CAT9555.InputData) => {
   console.log('input', data);
-  switch(data.pin) {
-    case 3:
-      cat.setPin(7, data.value);
-      break;
-    case 2:
-      cat.setPin(6, data.value);
-      break;
-    case 1:
-      cat.setPin(5, data.value);
-      break;
-    case 0:
-    default:
-      cat.setPin(4, data.value);
-      break;
+
+  // Check if a button attached to pin 7 is pressed (signal goes low)
+  if(data.pin === 7 && data.value === false){
+    // Toggle pin 1
+    pcf.setPin(1);
   }
 });
 
 // Handler for clean up on SIGINT (ctrl+c)
-process.on('SIGINT', () => {
-  cat.removeAllListeners();
-  cat.disableInterrupt();
+process.on('SIGINT', async () => {
+  await pcf.close();
+  i2cBus.closeSync();
 });

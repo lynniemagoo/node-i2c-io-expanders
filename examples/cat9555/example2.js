@@ -67,50 +67,117 @@ pcf.initialize(true)
     // setInterval(pcf.doPoll.bind(pcf), 250);
     return pcf.enableInterrupt(18);
 })
-    // Then define pin 0 as inverted output with initally false
+    // Then define pins 0-3 as inverted output initially false (off)
     .then(function () {
     return pcf.outputPin(0, true, false);
 })
-    // Then define pin 1 as inverted output with initally true
     .then(function () {
-    return pcf.outputPin(1, true, true);
+    return pcf.outputPin(1, true, false);
 })
-    // Then define pin 7 as non inverted input
     .then(function () {
-    return pcf.inputPin(7, false);
+    return pcf.outputPin(2, true, false);
+})
+    .then(function () {
+    return pcf.outputPin(3, true, false);
+})
+    // Then define pins 4-7 as inverted inputs
+    .then(function () {
+    return pcf.inputPin(7, true);
+})
+    .then(function () {
+    return pcf.inputPin(6, true);
+})
+    .then(function () {
+    return pcf.inputPin(5, true);
+})
+    .then(function () {
+    return pcf.inputPin(4, true);
+})
+    // Then toggle pin 1 (on)
+    .then(function () {
+    return pcf.setPin(1);
 })
     // Then delay 1 second
     .then(function () { return new Promise(function (resolve) {
     setTimeout(resolve, 1000);
 }); })
-    // Then turn pin 0 on
+    // Then toggle pin 1 (off)
     .then(function () {
-    console.log('turn pin 0 on');
-    return pcf.setPin(0, true);
+    return pcf.setPin(1);
 })
     // Then delay 1 second
     .then(function () { return new Promise(function (resolve) {
     setTimeout(resolve, 1000);
 }); })
-    // Then turn the pin 0 off
+    // Then toggle pin 2 (on)
     .then(function () {
-    console.log('turn pin 0 off');
-    return pcf.setPin(0, false);
-});
+    return pcf.setPin(2);
+})
+    // Then delay 1 second
+    .then(function () { return new Promise(function (resolve) {
+    setTimeout(resolve, 1000);
+}); })
+    // Then toggle pin 2 (off)
+    .then(function () {
+    pcf.setPin(2);
+})
+    // Then delay 1 second
+    .then(function () { return new Promise(function (resolve) {
+    setTimeout(resolve, 1000);
+}); });
 // Add an event listener on the 'input' event
 pcf.on('input', function (data) {
     console.log('input', data);
-    // Check if a button attached to pin 7 is pressed (signal goes low)
-    if (data.pin === 7 && data.value === false) {
-        // Toggle pin 1
-        pcf.setPin(1);
+    switch (data.pin) {
+        case 7:
+            // setPinReturns a promise which we do not wait for.
+            pcf.setPin(3, data.value);
+            break;
+        case 6:
+            // setPinReturns a promise which we do not wait for.
+            pcf.setPin(2, data.value);
+            break;
+        case 5:
+            // setPinReturns a promise which we do not wait for.
+            pcf.setPin(1, data.value);
+            break;
+        case 4:
+        default:
+            // setPinReturns a promise which we do not wait for.
+            pcf.setPin(0, data.value);
+            break;
     }
+});
+// It is possible if during 'input' event handling that you could miss an interrupt
+// if you block the event loop.  So, the 'interrupt' event is provided to signal the lastChild
+// interrupt that occurred.  After some time you can request a poll of the chip so that
+// the latest input pin states are read and any missed interrupt will be cleared.
+var _postInterruptTimeout = null;
+var POST_INTERRUPT_DELAY_TIME_MS = 10000;
+function clearPostInterruptTimeout() {
+    if (_postInterruptTimeout) {
+        clearTimeout(_postInterruptTimeout);
+        _postInterruptTimeout = null;
+    }
+}
+function createPostInterruptTimeout(delayTimeMs) {
+    clearPostInterruptTimeout();
+    _postInterruptTimeout = setTimeout(function () {
+        console.log('Last interrupt occurred %oms ago.  Will now poll chip', delayTimeMs);
+        // doPoll() returns a promise that we are not waiting on here.
+        pcf.doPoll();
+    }, delayTimeMs);
+}
+pcf.on('interrupt', function (_processed) {
+    createPostInterruptTimeout(POST_INTERRUPT_DELAY_TIME_MS);
 });
 // Handler for clean up on SIGINT (ctrl+c)
 process.on('SIGINT', function () { return __awaiter(void 0, void 0, void 0, function () {
     return __generator(this, function (_a) {
         switch (_a.label) {
-            case 0: return [4 /*yield*/, pcf.close()];
+            case 0:
+                clearPostInterruptTimeout();
+                return [4 /*yield*/, pcf.close()];
             case 1:
                 _a.sent();
                 i2cBus.closeSync();

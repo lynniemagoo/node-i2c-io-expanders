@@ -394,42 +394,9 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
       this._gpio = IOExpander._allInstancesUsedGpios[gpioPin].gpio;
       IOExpander._allInstancesUsedGpios[gpioPin].useCount++;
     } else {
-      // All IO chips will lower the interrupt pin as a notification.
-      // Under normal circumstances, we'd set the mode to 'falling'.
-      //
-      // However, we have seen issues when only capturing the 'falling' edge
-      // that we may miss an interrupt especially if they fire really fast.
-      // Not sure if cause is from onoff or epoll debounce times.
-      //
-      // The background reason for this change:
-      // See https://github.com/fivdi/epoll/issues/33#issuecomment-471772609
-      //
-      // This link was located when doing a google search for `epoll debound time`.
-      //
-      // So if we read an interrupt it is cleared at the epoll level.
-      // but if the pin is in process of changing quickly, in theory,
-      // this pin change could be missed.
-      //
-      // With 'both', we get more reliable interrupts and almost never
-      // miss a pin change.
-      //
-      // Before this change, pin changes were missed much more frequently
-      // when multiple inputs toggled states.  i.e. on a PCF8574 with 4 pins as inputs and 4
-      // pins as outputs, activating 4 inputs triggered activation of 4 outputs via an interrupt
-      // handler.  When all 4 inputs were activated within same ~100ms and then deactivated within
-      // same timespan, we might miss an input activation or a deactivation.
-      //
-      // This behavior may not be ideal if multiple IO chips share the same interrupt line
-      // as we could still miss interrupts as the interrupt pin will not go high until all interrupts
-      // are cleared from all chips sharing the same interrupt pin.
-      //
-      // Setting to 'both' also means that we will double-poll but if we read the same value
-      // a second time, we quickly identify which pins changed, avoid any loop overhead, and do not
-      // process any data if assigned input pins have not changed.
-      //
-      // See `_poll()', `inputPin()`, and `outputPin()` for how this is accomplished.
-      //
-      this._gpio = new Gpio(gpioPin, 'in', 'both');
+      // Init the GPIO as input with falling edge,
+      // because the chip will lower the interrupt line on changes
+      this._gpio = new Gpio(gpioPin, 'in', 'falling');
       IOExpander._allInstancesUsedGpios[gpioPin] = {
         gpio: this._gpio,
         useCount: 1

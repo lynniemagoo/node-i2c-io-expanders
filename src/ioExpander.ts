@@ -744,13 +744,16 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * This returns the last saved value, not the value currently returned by the IO Chip.
    * To get the current value call doPoll() first, if you're not using interrupts.
    * @param  {PinNumber} pin The pin number. (0 to 7 for PCF8574/PCF8574A, 0 to 15 for PCF8575, CAT9555, and MCP23017)
-   * @return {boolean}       The current value.
-   */
-  public getPinValue (pin: PinNumber): boolean {
-    if (pin < 0 || pin > (this._pins - 1)) {
-      return false;
+   * @return {Promise} Promise which gets resolved with boolean value of the chip..
+  */
+  public async getPinValue (pin: PinNumber): Promise<boolean> {
+   if (pin < 0 || pin > (this._pins - 1)) {
+      throw new Error('Pin out of range.');
     }
-    return ((this._currentState >> (pin as number)) % 2 !== 0)
+     // To avoid races, must ensure access and mutation of this._currentState are ordered via a queue.
+    return this._queue.enqueue(async () => {
+      return ((this._currentState >> (pin as number)) % 2 !== 0)
+    });
   }
 }
 

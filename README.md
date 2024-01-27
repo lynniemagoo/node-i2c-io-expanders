@@ -248,11 +248,11 @@ Returns a Promise which will be resolved when the new values are written to the 
 * `value` - The new value for this pin.
 
 
-### getPinValue(pin)
+### getPinValue(pin);
 ```ts
-getPinValue (pin: XXXXXX.PinNumber): boolean;
+getPinValue (pin: XXXXXX.PinNumber): Promise<boolean>;
 ```
-Returns the current value of a pin.
+Returns a Promise which will be resolved to the current value of the pin or rejected if pin out of range.
 This returns the last saved value, not the value currently returned by the XXXXXX IC.
 To get the current value call doPoll() first, if you're not using interrupts.
 

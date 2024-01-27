@@ -1,7 +1,6 @@
 # Various i2c-io-expanders (cat9555, mcp23017, pcf8574/pcf8575)
 
-MCP23017, CAT9555 are modeled after PCF8574 module created by Peter Müller <peter@crycode.de> (https://crycode.de/)
-**PCF8574 and PCF8575 are re-exported by this project.**
+MCP23017, CAT9555 are modeled after PCF8574/PCF8575 module created by Peter Müller <peter@crycode.de> (https://crycode.de/)
 
 Control each pin of a I2C port expander IC.
 
@@ -18,7 +17,9 @@ For more information about the MCP23017 please consult the [datasheet from Micro
 For more information about the PCF8574/PCF8574A please consult the [datasheet from Texas Instruments](http://www.ti.com/lit/ds/symlink/pcf8574.pdf).
 For more information about the PCF8575 please consult the [datasheet from Texas Instruments](https://www.ti.com/lit/ds/symlink/pcf8575.pdf).
 
-**Supported (tested) Node.js versions:** 10, 12, 14, 16, 18
+**Supported (tested) Node.js versions:** 10, 12, 14, 16, 18, 20
+
+**IMPORTANT: The MCP23017 IC supports physical separation into two Ports (A and B) each supporting a separate interrupt pin.  The current MCP23017 implementation in this package abstracts both 8-pin Ports (A and B) into a single device of 16 pins.  To support this configuration, interrupts are 'Mirrored' meaning that you can connect InterruptA or InterruptB to your CPU for processing interrupts.  See the MCP23017 datasheet for more details.  Future implementations may support treating each 8-pin Port (A or B) as separate class instances, however this configuration is not yet available nor tested.**
 
 ## Installation
 
@@ -37,85 +38,94 @@ To use the interrupt detection you need a Raspberry Pi or a similar board.
 Note that you need to construct the [i2c-bus](https://npmjs.org/package/i2c-bus) object
 and pass it in to the module along with the I2C address of the expander chip.
 
-The example below can be found in the [examples directory](https://github.com/lynniemagoo/node-i2c-io-expanders/tree/master/examples/cat9555) of this package together with a TypeScript example.
+The PCF8574 example below can be found in the [examples directory](https://github.com/lynniemagoo/node-i2c-io-expanders/tree/master/examples/pcf8574) of this package together with a TypeScript example.
 
 ```js
-// Require the cat9555 module
-const CAT9555 = require('@lynniemagoo/i2c-io-expanders').CAT9555;
+// Import the PCF8574 class
+//import { PCF8574 } from '@lynniemagoo/i2c-io-expanders';
+const import { PCF8574 } = require('@lynniemagoo/i2c-io-expanders');
 
-// Or use ES6 style imports
-// import { CAT9555 } from 'cat9555';
+// Import the i2c-bus module and open the bus
+import {I2CBus, openSync as I2CBusOpenSync} from 'i2c-bus';
+const i2cBus: I2CBus = I2CBusOpenSync(1);
 
-// Require the i2c-bus module and open the bus
-const i2cBus = require('i2c-bus').openSync(1);
+// Define the address of the PCF8574 (0x20) /PCF8574A (0x38)
+const addr: number = 0x20;
 
-// Define the address of the CAT9555
-const addr = 0x38;
+// Init a new PCF8574 with all pins high by default
+// Instead of 'true' you can also use a 8-bit binary notation to define each
+// pin separately, e.g. 0b00101010
+const pcf: PCF8574 = new PCF8574(i2cBus, addr);
 
-// Init a new CAT9555 with all pins high by default
-// Instead of 'true' you can also use a 16-bit binary notation to define each
-// pin separately, e.g. 0b0000000000101010
-const pcf = new CAT9555(i2cBus, addr, true);
-
-// Enable interrupt detection on BCM pin 17 (which is GPIO.0)
-pcf.enableInterrupt(17);
-
-// Alternatively you can use for example an interval for manually poll every 250ms
-// setInterval(pcf.doPoll.bind(pcf), 250);
 
 // Note the missing ; at the end of the following lines.
 // This is a Promise chain!
 
-// Define pin 0 as inverted output with initally false
-pcf.outputPin(0, true, false)
+// Init a new PCF8574 with all pins high by default
+// Instead of 'true' you can also use a 8-bit binary notation to define each
+// pin separately, e.g. 0b00101010
+pcf.initialize(true)
 
-// Then define pin 1 as inverted output with initally true
-.then(() => {
-  return pcf.outputPin(1, true, true);
-})
+  // Then enable interrupt detection on BCM pin 17 (which is GPIO.0)
+  .then(() => {
+    // Alternatively you can use for example an interval for manually poll every 250ms
+    // setInterval(pcf.doPoll.bind(pcf), 250);
+    return pcf.enableInterrupt(17);
+  })
 
-// Then define pin 7 as non inverted input
-.then(() => {
-  return pcf.inputPin(7, false);
-})
+  // Then define pin 0 as inverted output with initally false
+  .then(() => {
+    return pcf.outputPin(0, true, false);
+  })
 
-// Delay 1 second
-.then(() => new Promise((resolve) => {
-  setTimeout(resolve, 1000);
-}))
+  // Then define pin 1 as inverted output with initally true
+  .then(() => {
+    return pcf.outputPin(1, true, true);
+  })
 
-// Then turn the pin on
-.then(() => {
-  console.log('turn pin 0 on');
-  return pcf.setPin(0, true);
-})
+  // Then define pin 7 as non inverted input
+  .then(() => {
+    return pcf.inputPin(7, false);
+  })
 
-// Delay 1 second
-.then(() => new Promise((resolve) => {
-  setTimeout(resolve, 1000);
-}))
+  // Then delay 1 second
+  .then(() => new Promise((resolve) => {
+    setTimeout(resolve, 1000);
+  }))
 
-// Then turn the pin off
-.then(() => {
-  console.log('turn pin 0 off');
-  return pcf.setPin(0, false);
-});
+  // Then turn pin 0 on
+  .then(() => {
+    console.log('turn pin 0 on');
+    return pcf.setPin(0, true);
+  })
+
+  // Then delay 1 second
+  .then(() => new Promise((resolve) => {
+    setTimeout(resolve, 1000);
+  }))
+
+  // Then turn pin 0 off
+  .then(() => {
+    console.log('turn pin 0 off');
+    return pcf.setPin(0, false);
+  });
 
 // Add an event listener on the 'input' event
-pcf.on('input', (data) => {
+pcf.on('input', (data: PCF8574.InputData) => {
   console.log('input', data);
 
   // Check if a button attached to pin 7 is pressed (signal goes low)
   if(data.pin === 7 && data.value === false){
+    // setPin returns a promise which we do not wait for.
     // Toggle pin 1
     pcf.setPin(1);
   }
 });
 
 // Handler for clean up on SIGINT (ctrl+c)
-process.on('SIGINT', () => {
-  pcf.removeAllListeners();
-  pcf.disableInterrupt();
+process.on('SIGINT', async() => {
+  await pcf.close();
+  i2cBus.closeSync();
 });
 ```
 
@@ -135,15 +145,14 @@ If an inverted input has a low level it will be interpreted as true and a high l
 An inverted output will write a low level if you set it to true and write a high level if false.
 
 
-### new XXXXXX(i2cBus, address, initialState)
+### new XXXXXX(i2cBus, address)
 ```ts
-constructor (i2cBus: I2CBus, address: number, initialState: boolean | number);
+constructor (i2cBus: I2CBus, address: number);
 ```
 Constructor for a new XXXXXX instance.
 
 * `i2cBus` - Instance of an opened i2c-bus.
 * `address` - The address of the XXXXXX IC.
-* `initialState` - The initial state of the pins of this IC. You can set a bitmask (e.g. *0b0000000000101010*) to define each pin separately, or use true/false for all pins at once.
 
 Note that you need to construct the [i2c-bus](https://npmjs.org/package/i2c-bus) object and pass it in to the module.
 
@@ -151,9 +160,17 @@ If you use this IC with one or more input pins, you have to call
 * `enableInterrupt(gpioPin)` to detect interrupts from the IC using a GPIO pin, or
 * `doPoll()` frequently enough to detect input changes with manually polling.
 
+### initialize(initialHardwareState)
+```ts
+initialize(initialHardwareState: boolean | number): Promise<void>;
+```
+Initialize the chip.  
+* `initialState` - The initial state of the pins of this IC. You can set a bitmask (e.g. *0b0000000000101010*) to define each pin separately, or use true/false for all pins at once.
+
+
 ### enableInterrupt(gpioPin)
 ```ts
-enableInterrupt (gpioPin: XXXXXX.PinNumber): void;
+enableInterrupt (gpioPin: XXXXXX.PinNumber): Promise<void>;
 ```
 Enable the interrupt detection on the specified GPIO pin.
 You can use one GPIO pin for multiple instances of the XXXXXX class.
@@ -163,7 +180,7 @@ You can use one GPIO pin for multiple instances of the XXXXXX class.
 
 ### disableInterrupt()
 ```ts
-disableInterrupt (): void;
+disableInterrupt (): Promise<void>;
 ```
 Disable the interrupt detection.
 This will unexport the interrupt GPIO, if it is not used by an other instance of this class.
@@ -171,13 +188,15 @@ This will unexport the interrupt GPIO, if it is not used by an other instance of
 
 ### doPoll()
 ```ts
-doPoll (): Promise<void>;
+doPoll (): Promise<number>;
 ```
 Manually poll changed inputs from the XXXXXX IC.
 
 If a change on an input is detected, an `input` Event will be emitted with a data object containing the `pin` and the new `value`.
 This have to be called frequently enough if you don't use a GPIO for interrupt detection.
-If you poll again before the last poll was completed, the promise will be rejected with an error.
+Internally any poll operation is queued.  There can be at most 3 + number of pins on the IC active at any one time.
+If you reach this limit, the promise will be rejected with an error.
+Returns a Promise which will be resolved with a bitmask representing the internal state of the pins following a read from the IC.
 
 
 ### outputPin(pin, inverted, initialValue)
@@ -190,16 +209,16 @@ Returns a Promise which will be resolved when the pin is ready.
 
 * `pin` - The pin number. (0 to 15)
 * `inverted` - true if this pin should be handled inverted (true=low, false=high)
-* `initialValue` - (optional) The initial value of this pin, which will be set immediatly.
+* `initialValue` - (optional) The initial value of this pin, which will be set immediately.
 
 
 ### inputPin(pin, inverted)
 ```ts
-inputPin (pin: XXXXXX.PinNumber, inverted: boolean): Promise<>;
+inputPin (pin: XXXXXX.PinNumber, inverted: boolean): Promise<number>;
 ```
 Define a pin as an input.
 This marks the pin for input processing and activates the high level on this pin.
-Returns a Promise which will be resolved when the pin is ready.
+Returns a Promise which will be resolved with a bitmask representing the internal state of the pins following a read from the IC.
 
 * `pin` - The pin number. (0 to 7 | 15)
 * `inverted` - true if this pin should be handled inverted (high=false, low=true)
@@ -221,9 +240,9 @@ Returns a Promise which will be resolved when the new value is written to the IC
 
 ### setAllPins(value)
 ```ts
-setAllPins (value: boolean): Promise<void>;
+setAllPins (value: boolean | number): Promise<void>;
 ```
-Set the given value to all output pins.
+Set the given value to all output pins.  If a number is supplied, the bits in this number will be applied to output pins only.
 Returns a Promise which will be resolved when the new values are written to the IC.
 
 * `value` - The new value for this pin.

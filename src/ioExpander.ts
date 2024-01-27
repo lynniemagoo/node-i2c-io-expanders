@@ -614,7 +614,7 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * This marks the pin for input processing and activates the high level on this pin.
    * @param  {PinNumber}         pin      The pin number. (0 to 7 for PCF8574/PCF8574A, 0 to 15 for PCF8575, CAT9555, and MCP23017)
    * @param  {boolean}           inverted true if this pin should be handled inverted (high=false, low=true)
-   * @return {Promise}
+   * @return {Promise<number>}   number The current state of the pins.
    */
   public async inputPin (pin: PinNumber, inverted: boolean): Promise<number> {
     if (pin < 0 || pin > (this._pins - 1)) {

@@ -747,10 +747,10 @@ export abstract class IOExpander<PinNumber extends IOExpander.PinNumber8 | IOExp
    * @return {Promise} Promise which gets resolved with boolean value of the chip..
   */
   public async getPinValue (pin: PinNumber): Promise<boolean> {
-   if (pin < 0 || pin > (this._pins - 1)) {
+    if (pin < 0 || pin > (this._pins - 1)) {
       throw new Error('Pin out of range.');
     }
-     // To avoid races, must ensure access and mutation of this._currentState are ordered via a queue.
+    // To avoid races, must ensure access and mutation of this._currentState are ordered via a queue.
     return this._queue.enqueue(async () => {
       return ((this._currentState >> (pin as number)) % 2 !== 0)
     });

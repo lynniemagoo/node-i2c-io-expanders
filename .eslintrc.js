@@ -5,7 +5,8 @@ module.exports = {
         sourceType: 'module', // Allows for the use of imports
         project: [
           './tsconfig.json',
-          './examples/pcf857x/tsconfig.json',
+          './examples/pcf8574/tsconfig.json',
+          './examples/pcf8575/tsconfig.json',
           './examples/mcp23017/tsconfig.json',
           './examples/cat9555/tsconfig.json'
         ],

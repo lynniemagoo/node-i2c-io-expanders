@@ -1,5 +1,5 @@
 {
-  "name": "@lynniemagoo/i2c-io-expanders",
+  "name": "i2c-io-expanders",
   "version": "1.0.0",
   "description": "Various I2C IO expanders modeled after and including PCF8574 module created by Peter Müller <peter@crycode.de> (https://crycode.de/)",
   "keywords": [
@@ -21,7 +21,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=10.0.0"
   },
   "author": "Lyndel McGee <lynniemagoo@yahoo.com>",
   "contributors": [

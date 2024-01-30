@@ -17,7 +17,7 @@ For more information about the MCP23017 please consult the [datasheet from Micro
 For more information about the PCF8574/PCF8574A please consult the [datasheet from Texas Instruments](http://www.ti.com/lit/ds/symlink/pcf8574.pdf).
 For more information about the PCF8575 please consult the [datasheet from Texas Instruments](https://www.ti.com/lit/ds/symlink/pcf8575.pdf).
 
-**Supported (tested) Node.js versions:** 18, 20
+**Supported (tested) Node.js versions:** 10, 12, 14, 16, 18, 20
 
 **IMPORTANT: The MCP23017 IC supports physical separation into two Ports (A and B) each supporting a separate interrupt pin.  The current MCP23017 implementation in this package abstracts both 8-pin Ports (A and B) into a single device of 16 pins.  To support this configuration, interrupts are 'Mirrored' meaning that you can connect InterruptA or InterruptB to your CPU for processing interrupts.  See the MCP23017 datasheet for more details.  Future implementations may support treating each 8-pin Port (A or B) as separate class instances, however this configuration is not yet available nor tested.**
 
@@ -42,23 +42,23 @@ The PCF8574 example below can be found in the [examples directory](https://githu
 
 ```js
 // Import the PCF8574 class
-//import { PCF8574 } from 'i2c-io-expanders';
-import { PCF8574 } from '../../';
+//const { PCF8574 } require('i2c-io-expanders');
+const { PCF8574 } = require('../../');
 
 // Import the i2c-bus module and open the bus
-import {I2CBus, openSync as I2CBusOpenSync} from 'i2c-bus';
-const i2cBus: I2CBus = I2CBusOpenSync(1);
+const i2c = require('i2c-bus');
+const i2cBus = i2c.openSync(1);
 
 // Define a sleep Helper
-const sleepMs = (ms: number) : Promise<void> => new Promise((resolve) => {setTimeout(resolve, ms);})
+const sleepMs = (ms) => new Promise((resolve) => {setTimeout(resolve, ms);})
 
 // Define the address of the PCF8574 (0x20) /PCF8574A (0x38)
-const addr: number = 0x20;
+const addr = 0x20;
 
 // Create an instance of the chip.
-const chip: PCF8574 = new PCF8574(i2cBus, addr);
+const chip = new PCF8574(i2cBus, addr);
 
-const example = async () : Promise<void> => {
+const example = async () => {
 
   // Handler for clean up on SIGINT (ctrl+c)
   process.on('SIGINT', async () => {
@@ -95,7 +95,7 @@ const example = async () : Promise<void> => {
   await chip.setPin(0, false);
 
   // Add an event listener on the 'input' event
-  chip.on('input', (data: PCF8574.InputData) => {
+  chip.on('input', (data) => {
     console.log('input', data);
 
     // Check if a button attached to pin 7 is pressed (signal goes low)

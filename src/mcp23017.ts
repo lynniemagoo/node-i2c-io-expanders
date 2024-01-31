@@ -177,3 +177,165 @@ export class MCP23017 extends IOExpander<IOExpander.PinNumber16> {
     return this._writeChipRegister(MCP23017_REGISTERS.GPINTENA, 2, interruptBitmask);
   }
 }
+
+/**
+ * Namespace for types for MCP23017A
+ */
+export namespace MCP23017A {
+  /**
+   * A pin number from 0 to 7
+   * @type {number}
+   */
+  export type PinNumber = IOExpander.PinNumber8;
+
+  /**
+   * Possible pin directions.
+   * 0 = out, 1 = in, -1 = undefined
+   */
+  export type PinDirection = IOExpander.PinDirection;
+
+  /**
+   * Data of an 'input' event
+   * @type {Object}
+   */
+  export type InputData = IOExpander.InputData<PinNumber>;
+}
+
+/**
+ * Class for handling a MCP23017 IC for Port A.
+ */
+export class MCP23017A extends IOExpander<IOExpander.PinNumber8> {
+
+  /** Number of pins the IC has that are to be exposed PortA has 8 pins and PortB has 8 pins. */
+  protected _pins = <const>8;
+
+  /**
+   * Constructor for a new MCP23017 instance for pins on Port A.
+   * If you use this IC with one or more input pins, you have to call ...
+   *  a) enableInterrupt(gpioPin) to detect interrupts from the IC using a GPIO pin, or
+   *  b) doPoll() frequently enough to detect input changes with manually polling.
+   * @param  {I2cBus}         i2cBus       Instance of an opened i2c-bus.
+   * @param  {number}         address      The address of the MCP23017 IC.
+   */
+  constructor (i2cBus: I2CBus, address: number) {
+    super(i2cBus, address);
+  }
+
+  protected async _initializeChip (initialHardwareState: number) : Promise<void> {
+    // On startup, Default chip config to use Bank 0 with Open-Drain (Active Low) interrupts
+    const ioconFlags =
+      MCP23017_IOCON_FLAGS.DEFAULT |
+      MCP23017_IOCON_FLAGS.INT_OPEN_DRAIN_ENABLED;
+
+    await this._writeChipRegister(MCP23017_REGISTERS.IOCONA, 1, ioconFlags);
+    // Disable all interrupts.
+    await this._writeChipRegister(MCP23017_REGISTERS.GPINTENA, 1, 0x00);
+    // Set pins marked as input.
+    await this._writeChipRegister(MCP23017_REGISTERS.IODIRA, 1, this._inputPinBitmask);
+    // Force all pins to Pull-Up.
+    await this._writeChipRegister(MCP23017_REGISTERS.GPPUA, 1, 0xFF);
+    // Force no Polarity Invert as we will manage this in software with the _inverted bitField.
+    await this._writeChipRegister(MCP23017_REGISTERS.IPOLA, 1, 0x00);
+    // Set interrupt change default values to 0.
+    await this._writeChipRegister(MCP23017_REGISTERS.INTCONA, 1, 0x00);
+    // Write the initial state which should have no effect as all ports set as input (IODIRA) but ensures output register is set appropriately.
+    await this._writeChipRegister(MCP23017_REGISTERS.OLATA, 1, initialHardwareState);
+  }
+
+  protected _readState () : Promise<number> {
+    return this._readChipRegister(MCP23017_REGISTERS.GPIOA, 1);
+  }
+
+  protected _writeState (state: number) : Promise<void> {
+    return this._writeChipRegister(MCP23017_REGISTERS.OLATA, 1, state);
+  }
+
+  protected _writeDirection (inputPinBitmask: number) : Promise<void> {
+    return this._writeChipRegister(MCP23017_REGISTERS.IODIRA, 1, inputPinBitmask);
+  }
+
+  protected _writeInterruptControl(interruptBitmask: number) : Promise<void> {
+    return this._writeChipRegister(MCP23017_REGISTERS.GPINTENA, 1, interruptBitmask);
+  }
+}
+
+/**
+ * Namespace for types for MCP23017B
+ */
+export namespace MCP23017B {
+  /**
+   * A pin number from 0 to 7
+   * @type {number}
+   */
+  export type PinNumber = IOExpander.PinNumber8;
+
+  /**
+   * Possible pin directions.
+   * 0 = out, 1 = in, -1 = undefined
+   */
+  export type PinDirection = IOExpander.PinDirection;
+
+  /**
+   * Data of an 'input' event
+   * @type {Object}
+   */
+  export type InputData = IOExpander.InputData<PinNumber>;
+}
+
+/**
+ * Class for handling a MCP23017 IC for Port B.
+ */
+export class MCP23017B extends IOExpander<IOExpander.PinNumber8> {
+
+  /** Number of pins the IC has that are to be exposed PortA has 8 pins and PortB has 8 pins. */
+  protected _pins = <const>8;
+
+  /**
+   * Constructor for a new MCP23017 instance for pins on Port B.
+   * If you use this IC with one or more input pins, you have to call ...
+   *  a) enableInterrupt(gpioPin) to detect interrupts from the IC using a GPIO pin, or
+   *  b) doPoll() frequently enough to detect input changes with manually polling.
+   * @param  {I2cBus}         i2cBus       Instance of an opened i2c-bus.
+   * @param  {number}         address      The address of the MCP23017 IC.
+   */
+  constructor (i2cBus: I2CBus, address: number) {
+    super(i2cBus, address);
+  }
+
+  protected async _initializeChip (initialHardwareState: number) : Promise<void> {
+    // On startup, Default chip config to use Bank 0 with Open-Drain (Active Low) interrupts
+    const ioconFlags =
+      MCP23017_IOCON_FLAGS.DEFAULT |
+      MCP23017_IOCON_FLAGS.INT_OPEN_DRAIN_ENABLED;
+
+    await this._writeChipRegister(MCP23017_REGISTERS.IOCONB, 1, ioconFlags);
+    // Disable all interrupts.
+    await this._writeChipRegister(MCP23017_REGISTERS.GPINTENB, 1, 0x00);
+    // Set pins marked as input.
+    await this._writeChipRegister(MCP23017_REGISTERS.IODIRB, 1, this._inputPinBitmask);
+    // Force all pins to Pull-Up.
+    await this._writeChipRegister(MCP23017_REGISTERS.GPPUB, 1, 0xFF);
+    // Force no Polarity Invert as we will manage this in software with the _inverted bitField.
+    await this._writeChipRegister(MCP23017_REGISTERS.IPOLB, 1, 0x00);
+    // Set interrupt change default values to 0.
+    await this._writeChipRegister(MCP23017_REGISTERS.INTCONB, 1, 0x00);
+    // Write the initial state which should have no effect as all ports set as input (IODIRA) but ensures output register is set appropriately.
+    await this._writeChipRegister(MCP23017_REGISTERS.OLATB, 1, initialHardwareState);
+  }
+
+  protected _readState () : Promise<number> {
+    return this._readChipRegister(MCP23017_REGISTERS.GPIOB, 1);
+  }
+
+  protected _writeState (state: number) : Promise<void> {
+    return this._writeChipRegister(MCP23017_REGISTERS.OLATB, 1, state);
+  }
+
+  protected _writeDirection (inputPinBitmask: number) : Promise<void> {
+    return this._writeChipRegister(MCP23017_REGISTERS.IODIRB, 1, inputPinBitmask);
+  }
+
+  protected _writeInterruptControl(interruptBitmask: number) : Promise<void> {
+    return this._writeChipRegister(MCP23017_REGISTERS.GPINTENB, 1, interruptBitmask);
+  }
+}

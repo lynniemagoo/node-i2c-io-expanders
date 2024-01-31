@@ -1,6 +1,6 @@
 # Various i2c-io-expanders (cat9555, mcp23017, pcf8574/pcf8575)
 
-MCP23017, CAT9555 are modeled after PCF8574/PCF8575 module created by Peter Müller <peter@crycode.de> (https://crycode.de/)
+**MCP23017 (MCP23017A/B)**, **CAT9555** are modeled after **PCF8574/PCF8575** module created by Peter Müller <peter@crycode.de> (https://crycode.de/)
 
 Control each pin of a I2C port expander IC.
 
@@ -19,7 +19,15 @@ For more information about the PCF8575 please consult the [datasheet from Texas 
 
 **Supported (tested) Node.js versions:** 10, 12, 14, 16, 18, 20
 
-**IMPORTANT: The MCP23017 IC supports physical separation into two Ports (A and B) each supporting a separate interrupt pin.  The current MCP23017 implementation in this package abstracts both 8-pin Ports (A and B) into a single device of 16 pins.  To support this configuration, interrupts are 'Mirrored' meaning that you can connect InterruptA or InterruptB to your CPU for processing interrupts.  See the MCP23017 datasheet for more details.  Future implementations may support treating each 8-pin Port (A or B) as separate class instances, however this configuration is not yet available nor tested.**
+
+
+**IMPORTANT: The MCP23017 IC supports physical separation into two Ports (A and B) each supporting a separate interrupt pin.  The simple MCP23017 implementation in this package abstracts both 8-pin Ports (A and B) into a single device of 16 pins.  To support this configuration, interrupts are 'Mirrored' meaning that you can connect InterruptA or InterruptB pins to your CPU for processing interrupts. **
+
+**Additionally, this package provides the ability to address IC Ports independently via the MPC23017A and MCP23017B constructors.  In this configuration, interrupts are not 'Mirrored' meaning that depending on your needs, you connect the required pin, either InterruptA or InterruptB to your CPU for processing interrupts.**
+
+**For all MCP23017 implementations, interrupts are configured as 'Open-Drain'. See the MCP23017 examples folder as well as the  the MCP23017 datasheet for more details.**
+
+
 
 ## Installation
 

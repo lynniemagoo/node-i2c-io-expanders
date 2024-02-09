@@ -1,0 +1,51 @@
+{
+  "name": "i2c-io-expanders",
+  "version": "1.0.0",
+  "description": "Various I2C IO expanders modeled after and including PCF8574 module created by Peter Müller <peter@crycode.de> (https://crycode.de/)",
+  "keywords": [
+    "pcf8575",
+    "pcf8574",
+    "cat9555",
+    "mcp23017",
+    "i2c",
+    "portexpander",
+    "raspberry pi",
+    "gpio"
+  ],
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "prepublish": "tsc",
+    "build": "tsc",
+    "lint": "eslint --ext .ts src examples/pcf8574 examples/pcf8575 examples/mcp23017 examples/cat9555",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=10.0.0"
+  },
+  "author": "Lyndel McGee <lynniemagoo@yahoo.com>",
+  "contributors": [
+    "Peter Müller <peter@crycode.de> (https://crycode.de)"
+  ],
+  "license": "GPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lynniemagoo/node-i2c-io-expanders.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lynniemagoo/node-i2c-io-expanders/issues"
+  },
+  "devDependencies": {
+    "@types/i2c-bus": "^5.1.0",
+    "@types/node": "^20.11.0",
+    "@types/onoff": "^4.1.0",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "i2c-bus": "^5.2.3",
+    "onoff": "^6.0.3"
+  }
+}

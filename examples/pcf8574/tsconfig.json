@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "module": "commonjs",
+    "target": "es2018",
+    "noImplicitAny": false,
+    "removeComments": false,
+    "noEmit": false
+  },
+  "include": [
+    "*.ts"
+  ]
+}

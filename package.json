@@ -7,6 +7,7 @@
     "pcf8574",
     "cat9555",
     "mcp23017",
+    "mcp23008",
     "i2c",
     "portexpander",
     "raspberry pi",
@@ -17,7 +18,7 @@
   "scripts": {
     "prepublish": "tsc",
     "build": "tsc",
-    "lint": "eslint --ext .ts src examples/pcf8574 examples/pcf8575 examples/mcp23017 examples/cat9555",
+    "lint": "eslint --ext .ts src examples/pcf8574 examples/pcf8575 examples/mcp23017 examples/mcp23008 examples/cat9555",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {

@@ -8,6 +8,7 @@ module.exports = {
           './examples/pcf8574/tsconfig.json',
           './examples/pcf8575/tsconfig.json',
           './examples/mcp23017/tsconfig.json',
+          './examples/mcp23008/tsconfig.json',
           './examples/cat9555/tsconfig.json'
         ],
     },

@@ -1,21 +1,23 @@
-# Various i2c-io-expanders (cat9555, mcp23017, pcf8574/pcf8575)
+# Various i2c-io-expanders (cat9555, mcp23017, mcp23008, pcf8574/pcf8575)
 
-**MCP23017 (MCP23017A/B)**, **CAT9555** are modeled after **PCF8574/PCF8575** module created by Peter Müller <peter@crycode.de> (https://crycode.de/)
+**MCP23017 (MCP23017A/B)**, **MCP23008**, **CAT9555** are modeled after **PCF8574/PCF8575** module created by Peter Müller <peter@crycode.de> (https://crycode.de/)
 
 Control each pin of a I2C port expander IC.
 
+The PCF8574 is a 8 bit/pin port expander IC, which can be controlled over the I2C-Bus.
+The PCF8575 is a 16 bit/pin port expander IC, which can be controlled over the I2C-Bus.
 The CAT9555 is a 16 bit/pin port expander IC, which can be controlled over the I2C-Bus.
 The MCP23017 is a 16 bit/pin port expander IC, which can be controlled over the I2C-Bus.
-The PCF8575 is a 16 bit/pin port expander IC, which can be controlled over the I2C-Bus.
-The PCF8574 is a 8 bit/pin port expander IC, which can be controlled over the I2C-Bus.
+The MCP23008 is a 8 bit/pin port expander IC, which can be controlled over the I2C-Bus.
 
 Each of the pins can be separately used as an input or output.
 It also offers an interrupt signal, which can be used to detect input changes by the I2C master (e.g. a Raspberry Pi).
 
-For more information about the CAT9555 please consult the [datasheet from On Semiconductor (ONSEMI)](https://www.onsemi.com/pdf/datasheet/cat9555-d.pdf).
-For more information about the MCP23017 please consult the [datasheet from Microchip Technology](https://ww1.microchip.com/downloads/en/devicedoc/20001952c.pdf).
 For more information about the PCF8574/PCF8574A please consult the [datasheet from Texas Instruments](http://www.ti.com/lit/ds/symlink/pcf8574.pdf).
 For more information about the PCF8575 please consult the [datasheet from Texas Instruments](https://www.ti.com/lit/ds/symlink/pcf8575.pdf).
+For more information about the CAT9555 please consult the [datasheet from On Semiconductor (ONSEMI)](https://www.onsemi.com/pdf/datasheet/cat9555-d.pdf).
+For more information about the MCP23017 please consult the [datasheet from Microchip Technology](https://ww1.microchip.com/downloads/en/devicedoc/20001952c.pdf).
+For more information about the MCP23008 please consult the [datasheet from Microchip Technology](https://ww1.microchip.com/downloads/en/DeviceDoc/MCP23008-MCP23S08-Data-Sheet-20001919F.pdf).
 
 **Supported (tested) Node.js versions:** 10, 12, 14, 16, 18, 20
 
@@ -235,6 +237,22 @@ If you use this expander IC with one or more input pins, you have to call
 * `doPoll()` frequently enough to detect input changes with manually polling.
 
 
+### new MCP23008(i2cBus, address)
+```ts
+constructor (i2cBus: I2CBus, address: number);
+```
+Constructor for a new MCP23008 instance to address pins of the MCP23008 IC.
+
+* `i2cBus` - Instance of an opened i2c-bus.
+* `address` - The address of the MCP23008 IC.
+
+Note that you need to construct the [i2c-bus](https://npmjs.org/package/i2c-bus) object and pass it in to the module.
+
+If you use this expander IC with one or more input pins, you have to call
+* `enableInterrupt(gpioPin)` to detect interrupts from the expander IC using a GPIO pin, or
+* `doPoll()` frequently enough to detect input changes with manually polling.
+
+
 ### initialize(initialHardwareState)
 ```ts
 initialize(initialHardwareState?: boolean | number): Promise<void>;
@@ -248,7 +266,7 @@ Initialize the chip.
 enableInterrupt (gpioPin: <IOChipConstructor>.PinNumber): Promise<void>;
 ```
 Enable the interrupt detection on the specified GPIO pin.
-You can use one GPIO pin for multiple instances of any mixture of expander IC instances (PCF8754, PCF8575, CAT9555, MCP23017, MCP23017A, MCP23017B) .  
+You can use one GPIO pin for multiple instances of any mixture of expander IC instances (PCF8754, PCF8575, CAT9555, MCP23017, MCP23017A, MCP23017B, MCP23008).  
 
 * `gpioPin` - BCM number of the pin, which will be used for the interrupts from the expander IC.
 
@@ -310,7 +328,7 @@ If no value is given, the pin will be toggled.
 Returns a Promise which will be resolved when the new value is written to the expander IC.
 
 * `pin` - The pin number. (0 to 7 | 15)
-* `value` - The new value for this pin.
+* `value` - Optional new value for this pin.
 
 
 ### setAllPins(value)

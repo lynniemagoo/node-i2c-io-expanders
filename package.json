@@ -38,10 +38,9 @@
   },
   "devDependencies": {
     "@types/i2c-bus": "^5.1.0",
-    "@types/node": "^20.11.0",
-    "@types/onoff": "^4.1.0",
-    "@typescript-eslint/eslint-plugin": "^6.18.1",
-    "@typescript-eslint/parser": "^6.18.1",
+    "@types/node": "^20.11.17",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.56.0",
     "typescript": "^5.3.3"
   },

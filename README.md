@@ -137,7 +137,7 @@ An inverted output will write a low level if you set it to true and write a high
 
 Applications may also register for an 'interrupt' event that is fired upon completion of interrupt processing.  See the Example2 sample file for each chip for additional information.
 
-### new ChipType(i2cBus, address)
+### new PCF8574(i2cBus, address)
 
 ```ts
 constructor (i2cBus: I2CBus, address: number);
